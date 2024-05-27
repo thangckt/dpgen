@@ -101,7 +101,6 @@ from dpgen.util import (
     setup_ele_temp,
 )
 
-
 template_name = "template"
 train_name = "00.train"
 train_task_fmt = "%03d"
@@ -125,7 +124,7 @@ run_opt_file = os.path.join(ROOT_PATH, "generator/lib/calypso_run_opt.py")
 
 
 from .arginfo import run_jdata_arginfo
-from dpgen.generator.lib.gpaw import (make_fp_gpaw, post_fp_gpaw)
+
 
 def _get_model_suffix(jdata) -> str:
     """Return the model suffix based on the backend."""
@@ -876,31 +875,30 @@ def run_train(iter_index, jdata, mdata):
     except Exception:
         train_group_size = 1
 
-    api_version = mdata.get("api_version", "1.0")
-
     user_forward_files = mdata.get("train" + "_user_forward_files", [])
     forward_files += [os.path.basename(file) for file in user_forward_files]
     backward_files += mdata.get("train" + "_user_backward_files", [])
-    if Version(api_version) < Version("1.0"):
+
+    ### Submit the jobs
+    if Version(mdata.get("api_version", "1.0")) < Version("1.0"):
         raise RuntimeError(
-            f"API version {api_version} has been removed. Please upgrade to 1.0."
+            "API version below 1.0 is no longer supported. Please upgrade to version 1.0 or newer."
         )
 
-    elif Version(api_version) >= Version("1.0"):
-        submission = make_submission(
-            mdata["train_machine"],
-            mdata["train_resources"],
-            commands=commands,
-            work_path=work_path,
-            run_tasks=run_tasks,
-            group_size=train_group_size,
-            forward_common_files=trans_comm_data,
-            forward_files=forward_files,
-            backward_files=backward_files,
-            outlog="train.log",
-            errlog="train.log",
-        )
-        submission.run_submission()
+    submission = make_submission(
+        mdata["train_machine"],
+        mdata["train_resources"],
+        commands=commands,
+        work_path=work_path,
+        run_tasks=run_tasks,
+        group_size=train_group_size,
+        forward_common_files=trans_comm_data,
+        forward_files=forward_files,
+        backward_files=backward_files,
+        outlog="train.log",
+        errlog="train.log",
+    )
+    submission.run_submission()
 
 
 def post_train(iter_index, jdata, mdata):
@@ -2092,31 +2090,31 @@ def run_md_model_devi(iter_index, jdata, mdata):
     user_forward_files = mdata.get("model_devi" + "_user_forward_files", [])
     forward_files += [os.path.basename(file) for file in user_forward_files]
     backward_files += mdata.get("model_devi" + "_user_backward_files", [])
-    api_version = mdata.get("api_version", "1.0")
     if len(run_tasks) == 0:
         raise RuntimeError(
             "run_tasks for model_devi should not be empty! Please check your files."
         )
-    if Version(api_version) < Version("1.0"):
+
+    ### Submit the jobs
+    if Version(mdata.get("api_version", "1.0")) < Version("1.0"):
         raise RuntimeError(
-            f"API version {api_version} has been removed. Please upgrade to 1.0."
+            "API version below 1.0 is no longer supported. Please upgrade to version 1.0 or newer."
         )
 
-    elif Version(api_version) >= Version("1.0"):
-        submission = make_submission(
-            mdata["model_devi_machine"],
-            mdata["model_devi_resources"],
-            commands=commands,
-            work_path=work_path,
-            run_tasks=run_tasks,
-            group_size=model_devi_group_size,
-            forward_common_files=model_names,
-            forward_files=forward_files,
-            backward_files=backward_files,
-            outlog="model_devi.log",
-            errlog="model_devi.log",
-        )
-        submission.run_submission()
+    submission = make_submission(
+        mdata["model_devi_machine"],
+        mdata["model_devi_resources"],
+        commands=commands,
+        work_path=work_path,
+        run_tasks=run_tasks,
+        group_size=model_devi_group_size,
+        forward_common_files=model_names,
+        forward_files=forward_files,
+        backward_files=backward_files,
+        outlog="model_devi.log",
+        errlog="model_devi.log",
+    )
+    submission.run_submission()
 
 
 def run_model_devi(iter_index, jdata, mdata):
@@ -3816,8 +3814,6 @@ def make_fp_calculation(iter_index, jdata, mdata):
         make_fp_amber_diff(iter_index, jdata)
     elif fp_style == "custom":
         make_fp_custom(iter_index, jdata)
-    elif fp_style == "gpaw":
-        make_fp_gpaw(iter_index, jdata)
     else:
         raise RuntimeError("unsupported fp style")
     # Copy user defined forward_files
@@ -3970,27 +3966,26 @@ def run_fp_inner(
     forward_files += [os.path.basename(file) for file in user_forward_files]
     backward_files += mdata.get("fp" + "_user_backward_files", [])
 
-    api_version = mdata.get("api_version", "1.0")
-    if Version(api_version) < Version("1.0"):
+    ### Submit the jobs
+    if Version(mdata.get("api_version", "1.0")) < Version("1.0"):
         raise RuntimeError(
-            f"API version {api_version} has been removed. Please upgrade to 1.0."
+            "API version below 1.0 is no longer supported. Please upgrade to version 1.0 or newer."
         )
 
-    elif Version(api_version) >= Version("1.0"):
-        submission = make_submission(
-            mdata["fp_machine"],
-            mdata["fp_resources"],
-            commands=[fp_command],
-            work_path=work_path,
-            run_tasks=run_tasks,
-            group_size=fp_group_size,
-            forward_common_files=forward_common_files,
-            forward_files=forward_files,
-            backward_files=backward_files,
-            outlog=log_file,
-            errlog=log_file,
-        )
-        submission.run_submission()
+    submission = make_submission(
+        mdata["fp_machine"],
+        mdata["fp_resources"],
+        commands=[fp_command],
+        work_path=work_path,
+        run_tasks=run_tasks,
+        group_size=fp_group_size,
+        forward_common_files=forward_common_files,
+        forward_files=forward_files,
+        backward_files=backward_files,
+        outlog=log_file,
+        errlog=log_file,
+    )
+    submission.run_submission()
 
 
 def run_fp(iter_index, jdata, mdata):
@@ -4676,8 +4671,6 @@ def post_fp(iter_index, jdata):
         post_fp_amber_diff(iter_index, jdata)
     elif fp_style == "custom":
         post_fp_custom(iter_index, jdata)
-    elif fp_style == "gpaw":
-        post_fp_gpaw(iter_index, jdata)
     else:
         raise RuntimeError("unsupported fp style")
     post_fp_check_fail(iter_index, jdata)
