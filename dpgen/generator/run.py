@@ -122,8 +122,8 @@ calypso_run_model_devi_file = os.path.join(
 check_outcar_file = os.path.join(ROOT_PATH, "generator/lib/calypso_check_outcar.py")
 run_opt_file = os.path.join(ROOT_PATH, "generator/lib/calypso_run_opt.py")
 
-
 from .arginfo import run_jdata_arginfo
+from dpgen.generator.lib.gpaw import (make_fp_gpaw, post_fp_gpaw)
 
 
 def _get_model_suffix(jdata) -> str:
@@ -3814,6 +3814,8 @@ def make_fp_calculation(iter_index, jdata, mdata):
         make_fp_amber_diff(iter_index, jdata)
     elif fp_style == "custom":
         make_fp_custom(iter_index, jdata)
+    elif fp_style == "gpaw":
+        make_fp_gpaw(iter_index, jdata)
     else:
         raise RuntimeError("unsupported fp style")
     # Copy user defined forward_files
@@ -4671,6 +4673,8 @@ def post_fp(iter_index, jdata):
         post_fp_amber_diff(iter_index, jdata)
     elif fp_style == "custom":
         post_fp_custom(iter_index, jdata)
+    elif fp_style == "gpaw":
+        post_fp_gpaw(iter_index, jdata)
     else:
         raise RuntimeError("unsupported fp style")
     post_fp_check_fail(iter_index, jdata)
