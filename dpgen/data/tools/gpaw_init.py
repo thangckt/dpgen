@@ -61,6 +61,7 @@ def make_gpaw_relax(jdata, mdata):
         work_path=os.path.join(os.path.basename(out_dir), global_dirname_02),
         task_format={"fp": "sys-*"},
     )
+    return
 
 
 def run_gpaw_relax(jdata, mdata):
@@ -89,8 +90,8 @@ def run_gpaw_relax(jdata, mdata):
     check_api_version(mdata)
 
     submission = make_submission(
-        machine=mdata["fp_machine"],
-        resources = mdata["fp_resources"],
+        mdata["fp_machine"],
+        mdata["fp_resources"],
         commands=[fp_command],
         work_path=work_dir,
         run_tasks=run_tasks,
@@ -113,6 +114,7 @@ def run_gpaw_relax(jdata, mdata):
 ##### ANCHOR: Stage 2 - scale and perturb
 # Use the same `make_scale(jdata)` function as VASP
 def pert_scaled_gpaw(jdata):
+    ### Extract data from jdata
     out_dir = jdata["out_dir"]
     scale = jdata["scale"]
     pert_box = jdata["pert_box"]
@@ -120,6 +122,7 @@ def pert_scaled_gpaw(jdata):
     pert_numb = jdata["pert_numb"]
     from_poscar = jdata.get("from_poscar", False)
 
+    ### Get the current working directory and the system path
     cwd = os.getcwd()
     path_sp = os.path.join(out_dir, global_dirname_03)
     assert os.path.isdir(path_sp)
@@ -128,10 +131,9 @@ def pert_scaled_gpaw(jdata):
     sys_pe.sort()
     os.chdir(cwd)
 
+    ### Construct the perturbation command (note: current file is already in the tools directory)
     pert_cmd = os.path.dirname(__file__)
-    # pert_cmd = os.path.join(pert_cmd, "tools")    # current file is already in the tools directory
     pert_cmd = os.path.join(pert_cmd, "create_random_disturb.py")
-
     pert_cmd = (
         sys.executable
         + " "
@@ -139,14 +141,15 @@ def pert_scaled_gpaw(jdata):
         + f" -etmax {pert_box} -ofmt vasp POSCAR {pert_numb} {pert_atom} > /dev/null"
     )
 
+    ### Loop over each system and scale
     for ii in sys_pe:
         for jj in scale:
-            path_work = path_sp
-            path_work = os.path.join(path_work, ii)
-            path_work = os.path.join(path_work, f"scale-{jj:.3f}")
+            path_work = os.path.join(path_sp, ii, f"scale-{jj:.3f}")
             assert os.path.isdir(path_work)
             os.chdir(path_work)
             sp.check_call(pert_cmd, shell=True)
+
+            ### Loop over each perturbation
             for kk in range(pert_numb):
                 pos_in = f"POSCAR{(kk + 1)}.vasp"
                 dir_out = f"{(kk + 1):06d}"
@@ -158,16 +161,19 @@ def pert_scaled_gpaw(jdata):
                     shutil.copy2(pos_in, pos_out)
                 os.remove(pos_in)
 
-            kk = -1
-            pos_in = "POSCAR"
-            dir_out = f"{(kk + 1):06d}"
-            create_path(dir_out)
-            pos_out = os.path.join(dir_out, "POSCAR")
-            if not from_poscar:
-                poscar_shuffle(pos_in, pos_out)
-            else:
-                shutil.copy2(pos_in, pos_out)
+            ### Handle the special case
+            # kk = -1
+            # pos_in = "POSCAR"
+            # dir_out = f"{(kk + 1):06d}"
+            # create_path(dir_out)
+            # pos_out = os.path.join(dir_out, "POSCAR")
+            # if not from_poscar:
+            #     poscar_shuffle(pos_in, pos_out)
+            # else:
+            #     shutil.copy2(pos_in, pos_out)
+
             os.chdir(cwd)
+    return
 
 
 ##### ANCHOR: Stage 3 - run AIMD
@@ -219,6 +225,7 @@ def make_gpaw_md(jdata, mdata):
         work_path=os.path.join(os.path.basename(out_dir), global_dirname_04),
         task_format={"fp": "sys-*/scale*/00*"},
     )
+    return
 
 
 def run_gpaw_md(jdata, mdata):
@@ -343,7 +350,7 @@ def coll_gpaw_md(jdata):
 ##### ANCHOR: Support functions
 def check_gpaw_input(input_file: str) -> None:
     """
-    Check the input files for the GPAW calculation
+    Check the input files for the GPAW calculation, to ensure some necessary fields are set.
     """
     with open(input_file) as f:
         text = f.read()
