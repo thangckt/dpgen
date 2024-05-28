@@ -14,7 +14,7 @@ from ase.io.vasp import write_vasp
 from packaging.version import Version
 
 from dpgen.dispatcher.Dispatcher import make_submission
-from dpgen.generator.lib.utils import symlink_user_forward_files
+from dpgen.generator.lib.utils import symlink_user_forward_files, check_api_version
 
 ### use from...import... may cause circular import. To avoid this, functions in `gen` file must be defined before importing `gpaw_init`
 from ..gen import (
@@ -38,17 +38,18 @@ def make_gpaw_relax(jdata, mdata):
     assert os.path.isdir(work_dir)
     work_dir = os.path.abspath(work_dir)
 
-    gpaw_file = os.path.join(work_dir, "gpaw_relax.py")
-    shutil.copy2(jdata["relax_incar"], gpaw_file)
+    gpaw_input_name = os.path.basename(jdata["relax_incar"])        # file_name set in the .param file (only name, not path)
+    gpaw_runfile_path = os.path.join(work_dir, gpaw_input_name)     # file_path is generated in work_dir
+    shutil.copy2(jdata["relax_incar"], gpaw_runfile_path)           # copy the gpaw_input_name to the work_dir, now called "base_file"
 
     ### Generate symlinks for GPAW input files
     os.chdir(work_dir)
     sys_list = glob.glob("sys-*")
     for ss in sys_list:
         os.chdir(ss)
-        ln_src = os.path.relpath(gpaw_file)
+        ln_src = os.path.relpath(gpaw_runfile_path)     # remmeber the base_file path
         try:
-            os.symlink(ln_src, "gpaw_relax.py")
+            os.symlink(ln_src, gpaw_input_name)         # create a symlink (has name: gpaw_input_name) to the base_file
         except FileExistsError:
             pass
         os.chdir(work_dir)
@@ -64,12 +65,11 @@ def make_gpaw_relax(jdata, mdata):
 
 def run_gpaw_relax(jdata, mdata):
     check_gpaw_input(jdata["relax_incar"])
-    fp_command = mdata["fp_command"] + " gpaw_relax.py"
-    fp_group_size = mdata["fp_group_size"]
-    # machine_type = mdata['fp_machine']['machine_type']
+    gpaw_input_name = os.path.basename(jdata["relax_incar"])
+    fp_command = mdata["fp_command"] + gpaw_input_name
     work_dir = os.path.join(jdata["out_dir"], global_dirname_02)
 
-    forward_files = ["POSCAR", "gpaw_relax.py"]
+    forward_files = ["POSCAR", gpaw_input_name]
     user_forward_files = mdata.get("fp" + "_user_forward_files", [])
     forward_files += [os.path.basename(file) for file in user_forward_files]
     backward_files = ["CONF_ASE.traj", "calc.txt", "fp.log"]
@@ -83,22 +83,18 @@ def run_gpaw_relax(jdata, mdata):
     if len(relax_tasks) == 0:
         return
 
-    relax_run_tasks = relax_tasks
-    run_tasks = [os.path.basename(ii) for ii in relax_run_tasks]
+    run_tasks = [os.path.basename(ii) for ii in relax_tasks]
 
     ### Submit the jobs
-    if Version(mdata.get("api_version", "1.0")) < Version("1.0"):
-        raise RuntimeError(
-            "API version below 1.0 is no longer supported. Please upgrade to version 1.0 or newer."
-        )
+    check_api_version(mdata)
 
     submission = make_submission(
-        mdata["fp_machine"],
-        mdata["fp_resources"],
+        machine=mdata["fp_machine"],
+        resources = mdata["fp_resources"],
         commands=[fp_command],
         work_path=work_dir,
         run_tasks=run_tasks,
-        group_size=fp_group_size,
+        group_size=mdata["fp_group_size"],
         forward_common_files=forward_common_files,
         forward_files=forward_files,
         backward_files=backward_files,
@@ -133,17 +129,14 @@ def pert_scaled_gpaw(jdata):
     os.chdir(cwd)
 
     pert_cmd = os.path.dirname(__file__)
-    # pert_cmd = os.path.join(pert_cmd, "tools")
+    # pert_cmd = os.path.join(pert_cmd, "tools")    # current file is already in the tools directory
     pert_cmd = os.path.join(pert_cmd, "create_random_disturb.py")
-
-    fp_style = "vasp"
-    poscar_name = "POSCAR"
 
     pert_cmd = (
         sys.executable
         + " "
         + pert_cmd
-        + f" -etmax {pert_box} -ofmt {fp_style} {poscar_name} {pert_numb} {pert_atom} > /dev/null"
+        + f" -etmax {pert_box} -ofmt vasp POSCAR {pert_numb} {pert_atom} > /dev/null"
     )
 
     for ii in sys_pe:
@@ -195,8 +188,9 @@ def make_gpaw_md(jdata, mdata):
     path_md = os.path.abspath(path_md)
     create_path(path_md)
 
-    gpaw_file = os.path.join(path_md, "gpaw_aimd.py")
-    shutil.copy2(jdata["md_incar"], os.path.join(path_md, gpaw_file))
+    gpaw_input_name = os.path.basename(jdata["md_incar"])
+    gpaw_runfile_path = os.path.join(path_md, gpaw_input_name)
+    shutil.copy2(jdata["md_incar"], gpaw_runfile_path)
 
     for ii in sys_ps:
         for jj in scale:
@@ -214,7 +208,7 @@ def make_gpaw_md(jdata, mdata):
                 init_pos = os.path.join(path_pos, "POSCAR")
                 shutil.copy2(init_pos, "POSCAR")
                 try:
-                    os.symlink(os.path.relpath(gpaw_file), "gpaw_aimd.py")
+                    os.symlink(os.path.relpath(gpaw_runfile_path), gpaw_input_name)
                 except FileExistsError:
                     pass
                 os.chdir(cwd)
@@ -229,12 +223,11 @@ def make_gpaw_md(jdata, mdata):
 
 def run_gpaw_md(jdata, mdata):
     check_gpaw_input(jdata["md_incar"])
-    fp_command = mdata["fp_command"] + " gpaw_aimd.py"
-    fp_group_size = mdata["fp_group_size"]
-    # machine_type = mdata['fp_machine']['machine_type']
+    gpaw_input_name = os.path.basename(jdata["md_incar"])
+    fp_command = mdata["fp_command"] + gpaw_input_name
     work_dir = os.path.join(jdata["out_dir"], global_dirname_04)
 
-    forward_files = ["POSCAR", "gpaw_aimd.py"]
+    forward_files = ["POSCAR", gpaw_input_name]
     user_forward_files = mdata.get("fp" + "_user_forward_files", [])
     forward_files += [os.path.basename(file) for file in user_forward_files]
     backward_files = ["CONF_ASE.traj", "calc.txt", "fp.log"]
@@ -243,7 +236,6 @@ def run_gpaw_md(jdata, mdata):
 
     path_md = work_dir
     path_md = os.path.abspath(path_md)
-    cwd = os.getcwd()
     assert os.path.isdir(path_md), "md path should exists"
     md_tasks = glob.glob(os.path.join(work_dir, "sys-*/scale*/00*"))
     md_tasks.sort()
@@ -251,14 +243,10 @@ def run_gpaw_md(jdata, mdata):
     if len(md_tasks) == 0:
         return
 
-    md_run_tasks = md_tasks
-    run_tasks = [ii.replace(work_dir + "/", "") for ii in md_run_tasks]
+    run_tasks = [ii.replace(work_dir + "/", "") for ii in md_tasks]
 
     ### Submit the jobs
-    if Version(mdata.get("api_version", "1.0")) < Version("1.0"):
-        raise RuntimeError(
-            "API version below 1.0 is no longer supported. Please upgrade to version 1.0 or newer."
-        )
+    check_api_version(mdata)
 
     submission = make_submission(
         mdata["fp_machine"],
@@ -266,7 +254,7 @@ def run_gpaw_md(jdata, mdata):
         commands=[fp_command],
         work_path=work_dir,
         run_tasks=run_tasks,
-        group_size=fp_group_size,
+        group_size=mdata["fp_group_size"],
         forward_common_files=forward_common_files,
         forward_files=forward_files,
         backward_files=backward_files,
