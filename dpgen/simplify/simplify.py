@@ -18,13 +18,13 @@ from typing import Union
 
 import dpdata
 import numpy as np
-from packaging.version import Version
 
 from dpgen import dlog
 from dpgen.dispatcher.Dispatcher import make_submission
 
 # TODO: maybe the following functions can be moved to dpgen.util
 from dpgen.generator.lib.utils import (
+    check_api_version,
     create_path,
     log_iter,
     make_iter_name,
@@ -255,11 +255,8 @@ def run_model_devi(iter_index, jdata, mdata):
         commands.append(command_true_error)
         backward_files.append(true_error_file_name)
 
-    ### Submit the jobs
-    if Version(mdata.get("api_version", "1.0")) < Version("1.0"):
-        raise RuntimeError(
-            "API version below 1.0 is no longer supported. Please upgrade to version 1.0 or newer."
-        )
+    ### Submit jobs
+    check_api_version(mdata)
 
     submission = make_submission(
         mdata["model_devi_machine"],

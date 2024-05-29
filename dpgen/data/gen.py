@@ -10,7 +10,6 @@ import sys
 
 import dpdata
 import numpy as np
-from packaging.version import Version
 from pymatgen.core import Structure
 from pymatgen.io.vasp import Incar
 
@@ -28,7 +27,7 @@ from dpgen.generator.lib.abacus_scf import (
     make_abacus_scf_stru,
     make_supercell_abacus,
 )
-from dpgen.generator.lib.utils import symlink_user_forward_files
+from dpgen.generator.lib.utils import check_api_version, symlink_user_forward_files
 from dpgen.generator.lib.vasp import incar_upper
 from dpgen.remote.decide_machine import convert_mdata
 from dpgen.util import load_file
@@ -1158,11 +1157,8 @@ def run_vasp_relax(jdata, mdata):
     #        relax_run_tasks.append(ii)
     run_tasks = [os.path.basename(ii) for ii in relax_run_tasks]
 
-    ### Submit the jobs
-    if Version(mdata.get("api_version", "1.0")) < Version("1.0"):
-        raise RuntimeError(
-            "API version below 1.0 is no longer supported. Please upgrade to version 1.0 or newer."
-        )
+    ### Submit jobs
+    check_api_version(mdata)
 
     submission = make_submission(
         mdata["fp_machine"],
@@ -1297,11 +1293,8 @@ def run_abacus_relax(jdata, mdata):
     #        relax_run_tasks.append(ii)
     run_tasks = [os.path.basename(ii) for ii in relax_run_tasks]
 
-    ### Submit the jobs
-    if Version(mdata.get("api_version", "1.0")) < Version("1.0"):
-        raise RuntimeError(
-            "API version below 1.0 is no longer supported. Please upgrade to version 1.0 or newer."
-        )
+    ### Submit jobs
+    check_api_version(mdata)
 
     submission = make_submission(
         mdata["fp_machine"],
@@ -1358,11 +1351,8 @@ def run_vasp_md(jdata, mdata):
     # dlog.info("md_work_dir", work_dir)
     # dlog.info("run_tasks",run_tasks)
 
-    ### Submit the jobs
-    if Version(mdata.get("api_version", "1.0")) < Version("1.0"):
-        raise RuntimeError(
-            "API version below 1.0 is no longer supported. Please upgrade to version 1.0 or newer."
-        )
+    ### Submit jobs
+    check_api_version(mdata)
 
     submission = make_submission(
         mdata["fp_machine"],
@@ -1434,11 +1424,8 @@ def run_abacus_md(jdata, mdata):
     # dlog.info("md_work_dir", work_dir)
     # dlog.info("run_tasks",run_tasks)
 
-    ### Submit the jobs
-    if Version(mdata.get("api_version", "1.0")) < Version("1.0"):
-        raise RuntimeError(
-            "API version below 1.0 is no longer supported. Please upgrade to version 1.0 or newer."
-        )
+    ### Submit jobs
+    check_api_version(mdata)
 
     submission = make_submission(
         mdata["fp_machine"],

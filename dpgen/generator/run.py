@@ -78,6 +78,7 @@ from dpgen.generator.lib.run_calypso import (
 )
 from dpgen.generator.lib.siesta import make_siesta_input
 from dpgen.generator.lib.utils import (
+    check_api_version,
     create_path,
     log_iter,
     log_task,
@@ -879,11 +880,8 @@ def run_train(iter_index, jdata, mdata):
     forward_files += [os.path.basename(file) for file in user_forward_files]
     backward_files += mdata.get("train" + "_user_backward_files", [])
 
-    ### Submit the jobs
-    if Version(mdata.get("api_version", "1.0")) < Version("1.0"):
-        raise RuntimeError(
-            "API version below 1.0 is no longer supported. Please upgrade to version 1.0 or newer."
-        )
+    ### Submit jobs
+    check_api_version(mdata)
 
     submission = make_submission(
         mdata["train_machine"],
@@ -2095,11 +2093,8 @@ def run_md_model_devi(iter_index, jdata, mdata):
             "run_tasks for model_devi should not be empty! Please check your files."
         )
 
-    ### Submit the jobs
-    if Version(mdata.get("api_version", "1.0")) < Version("1.0"):
-        raise RuntimeError(
-            "API version below 1.0 is no longer supported. Please upgrade to version 1.0 or newer."
-        )
+    ### Submit jobs
+    check_api_version(mdata)
 
     submission = make_submission(
         mdata["model_devi_machine"],
@@ -3968,11 +3963,8 @@ def run_fp_inner(
     forward_files += [os.path.basename(file) for file in user_forward_files]
     backward_files += mdata.get("fp" + "_user_backward_files", [])
 
-    ### Submit the jobs
-    if Version(mdata.get("api_version", "1.0")) < Version("1.0"):
-        raise RuntimeError(
-            "API version below 1.0 is no longer supported. Please upgrade to version 1.0 or newer."
-        )
+    ### Submit jobs
+    check_api_version(mdata)
 
     submission = make_submission(
         mdata["fp_machine"],
