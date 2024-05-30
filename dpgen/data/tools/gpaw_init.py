@@ -165,6 +165,7 @@ def make_gpaw_md(jdata, mdata):
     scale = jdata["scale"]
     pert_numb = jdata["pert_numb"]
 
+    ### Get the current working directory and the system path
     cwd = os.getcwd()
     path_ps = os.path.join(out_dir, global_dirname_03)
     path_ps = os.path.abspath(path_ps)
@@ -177,23 +178,20 @@ def make_gpaw_md(jdata, mdata):
     path_md = os.path.abspath(path_md)
     create_path(path_md)
 
+    ### Copy the GPAW input file to the MD path
     gpaw_input_name = os.path.basename(jdata["md_incar"])
     gpaw_runfile_path = os.path.join(path_md, gpaw_input_name)
     shutil.copy2(jdata["md_incar"], gpaw_runfile_path)
 
+    ### Loop over each system, scale, and perturbation number
     for ii in sys_ps:
         for jj in scale:
             for kk in range(pert_numb):
-                path_work = path_md
-                path_work = os.path.join(path_work, ii)
-                path_work = os.path.join(path_work, f"scale-{jj:.3f}")
-                path_work = os.path.join(path_work, f"{kk:06d}")
+                path_work = os.path.join(path_md, ii, f"scale-{jj:.3f}", f"{kk:06d}")
                 create_path(path_work)
                 os.chdir(path_work)
-                path_pos = path_ps
-                path_pos = os.path.join(path_pos, ii)
-                path_pos = os.path.join(path_pos, f"scale-{jj:.3f}")
-                path_pos = os.path.join(path_pos, f"{kk:06d}")
+
+                path_pos = os.path.join(path_ps, ii, f"scale-{jj:.3f}", f"{kk:06d}")
                 init_pos = os.path.join(path_pos, "POSCAR")
                 shutil.copy2(init_pos, "POSCAR")
                 try:
@@ -224,12 +222,11 @@ def run_gpaw_md(jdata, mdata):
     backward_files += mdata.get("fp" + "_user_backward_files", [])
     forward_common_files = []
 
-    path_md = work_dir
-    path_md = os.path.abspath(path_md)
+    path_md = os.path.abspath(work_dir)
     assert os.path.isdir(path_md), "md path should exists"
+
     md_tasks = glob.glob(os.path.join(work_dir, "sys-*/scale*/00*"))
     md_tasks.sort()
-
     if len(md_tasks) == 0:
         return
 
