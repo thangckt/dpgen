@@ -11,6 +11,7 @@ import sys
 import dpdata
 from ase.io import Trajectory
 from ase.io.vasp import write_vasp
+import numpy as np
 
 from dpgen import  dlog
 from dpgen.dispatcher.Dispatcher import make_submission
@@ -61,6 +62,7 @@ def make_gpaw_relax(jdata, mdata):
         work_path=os.path.join(os.path.basename(out_dir), global_dirname_02),
         task_format={"fp": "sys-*"},
     )
+    return
 
 
 
@@ -107,6 +109,7 @@ def run_gpaw_relax(jdata, mdata):
         if os.path.isfile(f"{ii}/CONF_ASE.traj"):
             traj = Trajectory(f"{ii}/CONF_ASE.traj")
             write_vasp(f"{ii}/CONTCAR", traj[-1])
+    return
 
 
 ##### ANCHOR: Stage 2 - scale and perturb
@@ -154,7 +157,7 @@ def pert_scaled_gpaw(jdata):
                 os.remove(pos_in)
 
             os.chdir(cwd)
-
+    return
 
 
 ##### ANCHOR: Stage 3 - run AIMD
@@ -204,7 +207,7 @@ def make_gpaw_md(jdata, mdata):
         work_path=os.path.join(os.path.basename(out_dir), global_dirname_04),
         task_format={"fp": "sys-*/scale*/00*"},
     )
-
+    return
 
 
 def run_gpaw_md(jdata, mdata):
@@ -252,7 +255,6 @@ def run_gpaw_md(jdata, mdata):
 ##### ANCHOR: Stage 4 - collect data
 def coll_gpaw_md(jdata):
     out_dir = jdata["out_dir"]
-    md_nstep = jdata["md_nstep"]
     scale = jdata["scale"]
     pert_numb = jdata["pert_numb"]
     coll_ndata = jdata["coll_ndata"]
@@ -269,65 +271,61 @@ def coll_gpaw_md(jdata):
     ### Loop over each system, scale, and perturbation number
     for ii in sys_md:
         os.chdir(ii)
-        # convert outcars
-        valid_outcars = []
+        ### Check if the trajectory file is valid
+        valid_trajs = []
         for jj in scale:
             for kk in range(pert_numb):
                 path_work = os.path.join(f"scale-{jj:.3f}", f"{kk:06d}")
+                traj_file = os.path.join(path_work, "CONF_ASE.traj")
+                if os.path.isfile(traj_file):
+                    valid_trajs.append(traj_file)
 
 
-                outcar = os.path.join(path_work, "OUTCAR")
-                # dlog.info("OUTCAR",outcar)
-                if os.path.isfile(outcar):
-                    # dlog.info("*"*40)
-                    with open(outcar) as fin:
-                        nforce = fin.read().count("TOTAL-FORCE")
-                    # dlog.info("nforce is", nforce)
-                    # dlog.info("md_nstep", md_nstep)
-                    if nforce == md_nstep:
-                        valid_outcars.append(outcar)
-                    elif md_nstep == 0 and nforce == 1:
-                        valid_outcars.append(outcar)
-                    else:
-                        dlog.info(
-                            f"WARNING : in directory {os.getcwd()} nforce in OUTCAR is not equal to settings in INCAR"
-                        )
-        arg_cvt = " "
-        if len(valid_outcars) == 0:
+                    # with open(outcar) as fin:
+                    #     nforce = fin.read().count("TOTAL-FORCE")
+                    # # dlog.info("nforce is", nforce)
+                    # # dlog.info("md_nstep", md_nstep)
+                    # if nforce == md_nstep:
+                    #     valid_outcars.append(outcar)
+                    # elif md_nstep == 0 and nforce == 1:
+                    #     valid_outcars.append(outcar)
+                    # else:
+                    #     dlog.info(
+                    #         f"WARNING : in directory {os.getcwd()} nforce in OUTCAR is not equal to settings in INCAR"
+                    #     )
+
+
+        if len(valid_trajs) == 0:
             raise RuntimeError(
-                f"MD dir: {path_md}: find no valid outcar in sys {ii}, "
-                "check if your vasp md simulation is correctly done"
+                f"MD dir {path_md} contains no valid ase_traj in sys {ii}, check if your aimd simulation is correctly done"
             )
 
-        flag = True
         type_map = None
         if ("type_map" in jdata) and isinstance(jdata["type_map"], list):
             type_map = jdata["type_map"]
 
-        for oo in valid_outcars:
-            if flag:
-                _sys = dpdata.LabeledSystem(oo, type_map=type_map)
-                if len(_sys) > 0:
-                    all_sys = _sys
-                    flag = False
+        ### Load the valid trajectories
+        for i, file in enumerate(valid_trajs):
+            _sys = dpdata.LabeledSystem(file, fmt="ase/traj", type_map=type_map)
+            if len(_sys) > 0:
+                if i==0:
+                    all_sys = _sys    # initialize the all_sys
                 else:
-                    pass
-            else:
-                _sys = dpdata.LabeledSystem(oo, type_map=type_map)
-                if len(_sys) > 0:
                     all_sys.append(_sys)
-        # create deepmd data
+
+        ### convert to deepmd data
         if all_sys.get_nframes() >= coll_ndata:
             all_sys = all_sys.sub_system(np.arange(coll_ndata))
+        else:
+            dlog.info(
+                f"WARNING : {all_sys.get_nframes()} frames are collected, which are less than the setting 'coll_ndata'={coll_ndata}. Consider to increase the 'md_nstep' or number of initial configurations."
+            )
+
         all_sys.to_deepmd_raw("deepmd")
         all_sys.to_deepmd_npy("deepmd", set_size=all_sys.get_nframes())
         os.chdir(path_md)
     os.chdir(cwd)
-
-    print(" not implemented yet")
-
     return
-
 
 ##### ANCHOR: Support functions
 def check_gpaw_input(input_file: str) -> None:
