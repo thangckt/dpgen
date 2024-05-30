@@ -132,14 +132,8 @@ def pert_scaled_gpaw(jdata):
     os.chdir(cwd)
 
     ### Construct the perturbation command (note: current file is already in the tools directory)
-    pert_cmd = os.path.dirname(__file__)
-    pert_cmd = os.path.join(pert_cmd, "create_random_disturb.py")
-    pert_cmd = (
-        sys.executable
-        + " "
-        + pert_cmd
-        + f" -etmax {pert_box} -ofmt vasp POSCAR {pert_numb} {pert_atom} > /dev/null"
-    )
+    python_exec = os.path.join(os.path.dirname(__file__), "create_random_disturb.py")
+    pert_cmd = sys.executable + f" {python_exec} -etmax {pert_box} -ofmt vasp POSCAR {pert_numb} {pert_atom} > /dev/null"
 
     ### Loop over each system and scale
     for ii in sys_pe:
@@ -151,8 +145,10 @@ def pert_scaled_gpaw(jdata):
 
             ### Loop over each perturbation
             for kk in range(pert_numb):
-                pos_in = f"POSCAR{(kk + 1)}.vasp"
-                dir_out = f"{(kk + 1):06d}"
+                # pos_in = f"POSCAR{(kk + 1)}.vasp"
+                # dir_out = f"{(kk + 1):06d}"
+                pos_in = f"POSCAR{kk}.vasp"
+                dir_out = f"{kk:06d}"
                 create_path(dir_out)
                 pos_out = os.path.join(dir_out, "POSCAR")
                 if not from_poscar:

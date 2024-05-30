@@ -122,8 +122,9 @@ def create_disturbs_ase_dev(
     natoms = atoms.get_global_number_of_atoms()
     cell0 = atoms.get_cell()
 
-    # creat nfile ofmt files.
-    for fid in range(1, nfile + 1):
+    ### creat nfile ofmt files.
+    # for fid in range(1, nfile + 1):     # C.Thang Nguyen: Why not start from 0?
+    for fid in range(nfile):
         # Use copy(), otherwise it will modify the input atoms every time.
         atoms_d = atoms.copy()
 
