@@ -354,15 +354,16 @@ def make_vasp_relax(jdata):
     out_dir = jdata["out_dir"]
     potcars = jdata["potcars"]
     cwd = os.getcwd()
-
     work_dir = os.path.join(out_dir, global_dirname_02)
     assert os.path.isdir(work_dir)
     work_dir = os.path.abspath(work_dir)
+
     if os.path.isfile(os.path.join(work_dir, "INCAR")):
         os.remove(os.path.join(work_dir, "INCAR"))
     if os.path.isfile(os.path.join(work_dir, "POTCAR")):
         os.remove(os.path.join(work_dir, "POTCAR"))
     shutil.copy2(jdata["relax_incar"], os.path.join(work_dir, "INCAR"))
+
     out_potcar = os.path.join(work_dir, "POTCAR")
     with open(out_potcar, "w") as outfile:
         for fname in potcars:
@@ -440,15 +441,12 @@ def make_scale(jdata):
         for jj in scale:
             if skip_relax:
                 pos_src = os.path.join(os.path.join(init_path, ii), "POSCAR")
-                assert os.path.isfile(pos_src)
             else:
-                try:
-                    pos_src = os.path.join(os.path.join(init_path, ii), "CONTCAR")
-                    assert os.path.isfile(pos_src)
-                except Exception:
-                    raise RuntimeError(
-                        "not file %s, vasp relaxation should be run before scale poscar"
-                    )
+                pos_src = os.path.join(os.path.join(init_path, ii), "CONTCAR")
+            if not os.path.isfile(pos_src):
+                raise RuntimeError(
+                    f"file {pos_src} not found, vasp relaxation should be run before scale poscar"
+                )
             scale_path = os.path.join(work_path, ii)
             scale_path = os.path.join(scale_path, f"scale-{jj:.3f}")
             create_path(scale_path)
@@ -501,46 +499,32 @@ def pert_scaled(jdata):
     sys_pe.sort()
     os.chdir(cwd)
 
-    pert_cmd = (
-        sys.executable
-        + " "
-        + os.path.join(ROOT_PATH, "data/tools/create_random_disturb.py")
-    )
-    pert_cmd += " -etmax %f -ofmt vasp POSCAR %d %f > /dev/null" % (
-        pert_box,
-        pert_numb,
-        pert_atom,
-    )
+    ### Construct the perturbation command
+    python_exec = os.path.join(os.path.dirname(__file__), "create_random_disturb.py")
+    pert_cmd = sys.executable + f" {python_exec} -etmax {pert_box} -ofmt vasp POSCAR {pert_numb} {pert_atom} > /dev/null"
+
+    ### Loop over each system and scale
     for ii in sys_pe:
         for jj in scale:
-            path_scale = path_sp
-            path_scale = os.path.join(path_scale, ii)
-            path_scale = os.path.join(path_scale, f"scale-{jj:.3f}")
-            assert os.path.isdir(path_scale)
-            os.chdir(path_scale)
-            dlog.info(os.getcwd())
-            poscar_in = os.path.join(path_scale, "POSCAR")
+            path_work = os.path.join(path_sp, ii, f"scale-{jj:.3f}")
+            assert os.path.isdir(path_work)
+            os.chdir(path_work)
+
+            poscar_in = os.path.join(path_work, "POSCAR")
             assert os.path.isfile(poscar_in)
             for ll in elongs:
-                path_elong = path_scale
-                path_elong = os.path.join(path_elong, f"elong-{ll:3.3f}")
+                path_elong = os.path.join(path_work, f"elong-{ll:3.3f}")
                 create_path(path_elong)
                 os.chdir(path_elong)
                 poscar_elong(poscar_in, "POSCAR", ll)
-                sp.check_call(pert_cmd, shell=True)
+                sp.run(pert_cmd, shell=True)
                 for kk in range(pert_numb):
-                    pos_in = "POSCAR%d.vasp" % (kk + 1)
-                    dir_out = "%06d" % (kk + 1)
+                    pos_in = f"POSCAR{kk}.vasp"
+                    dir_out = f"{kk:06d}"
                     create_path(dir_out)
                     pos_out = os.path.join(dir_out, "POSCAR")
                     poscar_shuffle(pos_in, pos_out)
                     os.remove(pos_in)
-                kk = -1
-                pos_in = "POSCAR"
-                dir_out = "%06d" % (kk + 1)
-                create_path(dir_out)
-                pos_out = os.path.join(dir_out, "POSCAR")
-                poscar_shuffle(pos_in, pos_out)
                 os.chdir(cwd)
 
 
@@ -605,31 +589,45 @@ def run_vasp_relax(jdata, mdata):
         api_version=mdata.get("api_version", "0.9"),
     )
 
+from dpgen.data.tools.gpaw_init import (
+    coll_gpaw_md,
+    make_gpaw_md,
+    make_gpaw_relax,
+    pert_scaled_gpaw,
+    run_gpaw_md,
+    run_gpaw_relax,
+)
+
 
 def gen_init_surf(args):
     jdata = load_file(args.PARAM)
-
-    out_dir = out_dir_name(jdata)
-    jdata["out_dir"] = out_dir
-    dlog.info(f"# working dir {out_dir}")
-
     if args.MACHINE is not None:
         mdata = load_file(args.MACHINE)
         # Decide a proper machine
         mdata = convert_mdata(mdata, ["fp"])
         # disp = make_dispatcher(mdata["fp_machine"])
 
-    # stage = args.STAGE
+    out_dir = out_dir_name(jdata)
+    jdata["out_dir"] = out_dir
+    dlog.info(f"# working dir {out_dir}")
+
+    ## Iteration
     stage_list = [int(i) for i in jdata["stages"]]
     for stage in stage_list:
         if stage == 1:
+            dlog.info("Current stage is 1, relax")
             create_path(out_dir)
             make_super_cell_pymatgen(jdata)
             place_element(jdata)
-            make_vasp_relax(jdata)
             if args.MACHINE is not None:
-                run_vasp_relax(jdata, mdata)
+                if jdata["init_fp_style"] == "VASP":
+                    make_vasp_relax(jdata)
+                    run_vasp_relax(jdata, mdata)
+                elif jdata["init_fp_style"] == "GPAW":
+                    make_gpaw_relax(jdata, mdata)
+                    run_gpaw_relax(jdata, mdata)
         elif stage == 2:
+            dlog.info("Current stage is 2, perturb and scale")
             make_scale(jdata)
             pert_scaled(jdata)
         else:

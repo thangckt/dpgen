@@ -49,10 +49,7 @@ def make_gpaw_relax(jdata, mdata):
     for ss in sys_list:
         os.chdir(ss)
         ln_src = os.path.relpath(gpaw_runfile_path)     # remmeber the base_file path
-        try:
-            os.symlink(ln_src, gpaw_input_name)         # create a symlink (has name: gpaw_input_name) to the base_file
-        except FileExistsError:
-            pass
+        os.symlink(ln_src, gpaw_input_name)         # create a symlink (has name: gpaw_input_name) to the base_file
         os.chdir(work_dir)
 
     os.chdir(cwd)
@@ -279,19 +276,6 @@ def coll_gpaw_md(jdata):
                 if os.path.isfile(traj_file):
                     valid_trajs.append(traj_file)
 
-                    # with open(outcar) as fin:
-                    #     nforce = fin.read().count("TOTAL-FORCE")
-                    # # dlog.info("nforce is", nforce)
-                    # # dlog.info("md_nstep", md_nstep)
-                    # if nforce == md_nstep:
-                    #     valid_outcars.append(outcar)
-                    # elif md_nstep == 0 and nforce == 1:
-                    #     valid_outcars.append(outcar)
-                    # else:
-                    #     dlog.info(
-                    #         f"WARNING : in directory {os.getcwd()} nforce in OUTCAR is not equal to settings in INCAR"
-                    #     )
-
         if len(valid_trajs) == 0:
             raise RuntimeError(
                 f"MD dir {path_md} contains no valid ase_traj in sys {ii}, check if your aimd simulation is correctly done"
@@ -301,7 +285,7 @@ def coll_gpaw_md(jdata):
         if ("type_map" in jdata) and isinstance(jdata["type_map"], list):
             type_map = jdata["type_map"]
 
-        ### Load the valid trajectories
+        ### Load the data
         for i, file in enumerate(valid_trajs):
             _sys = dpdata.LabeledSystem(file, fmt="ase/traj", type_map=type_map)
             if len(_sys) > 0:
@@ -320,6 +304,13 @@ def coll_gpaw_md(jdata):
 
         all_sys.to_deepmd_raw("deepmd")
         all_sys.to_deepmd_npy("deepmd", set_size=all_sys.get_nframes())
+
+        ### check the stress
+        if not os.path.isfile("deepmd/virial.raw"):
+            dlog.info(
+                f"WARNING : data in folder {path_md}/{ii} does not contain stress information. May need to check DFT calculation."
+            )
+
         os.chdir(path_md)
     os.chdir(cwd)
     return
