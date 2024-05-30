@@ -500,7 +500,9 @@ def pert_scaled(jdata):
     os.chdir(cwd)
 
     ### Construct the perturbation command
-    python_exec = os.path.join(os.path.dirname(__file__), "create_random_disturb.py")
+    python_exec = os.path.join(
+        os.path.dirname(__file__), "tools", "create_random_disturb.py"
+    )
     pert_cmd = sys.executable + f" {python_exec} -etmax {pert_box} -ofmt vasp POSCAR {pert_numb} {pert_atom} > /dev/null"
 
     ### Loop over each system and scale
