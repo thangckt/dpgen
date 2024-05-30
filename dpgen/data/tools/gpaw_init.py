@@ -183,7 +183,7 @@ def make_gpaw_md(jdata, mdata):
 
     for ii in sys_ps:
         for jj in scale:
-            for kk in range(pert_numb + 1):
+            for kk in range(pert_numb):
                 path_work = path_md
                 path_work = os.path.join(path_work, ii)
                 path_work = os.path.join(path_work, f"scale-{jj:.3f}")
