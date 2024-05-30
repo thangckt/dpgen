@@ -300,10 +300,9 @@ def coll_gpaw_md(jdata):
             )
 
         flag = True
+        type_map = None
         if ("type_map" in jdata) and isinstance(jdata["type_map"], list):
             type_map = jdata["type_map"]
-        else:
-            type_map = None
 
         for oo in valid_outcars:
             if flag:
@@ -347,4 +346,8 @@ def check_gpaw_input(input_file: str) -> None:
         raise ValueError(
             f"The GPAW input file {input_file} did not output the trajectory file 'CONF_ASE.traj'. It should be set for backward files."
         )
+    return
+
+def check_valid_ASEtraj():
+    """check if the ASE trajectory is valid for the deepmd data generation. It should contain the forces, energies, and stress."""
     return
