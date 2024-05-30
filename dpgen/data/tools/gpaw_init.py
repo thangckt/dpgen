@@ -13,7 +13,7 @@ from ase.io import Trajectory
 from ase.io.vasp import write_vasp
 import numpy as np
 
-from dpgen import  dlog
+from dpgen import dlog
 from dpgen.dispatcher.Dispatcher import make_submission
 from dpgen.generator.lib.utils import symlink_user_forward_files, check_api_version
 
@@ -63,7 +63,6 @@ def make_gpaw_relax(jdata, mdata):
         task_format={"fp": "sys-*"},
     )
     return
-
 
 
 def run_gpaw_relax(jdata, mdata):
@@ -142,7 +141,7 @@ def pert_scaled_gpaw(jdata):
             path_work = os.path.join(path_sp, ii, f"scale-{jj:.3f}")
             assert os.path.isdir(path_work)
             os.chdir(path_work)
-            sp.check_call(pert_cmd, shell=True)
+            sp.run(pert_cmd, shell=True)
 
             ### Loop over each perturbation
             for kk in range(pert_numb):
@@ -280,7 +279,6 @@ def coll_gpaw_md(jdata):
                 if os.path.isfile(traj_file):
                     valid_trajs.append(traj_file)
 
-
                     # with open(outcar) as fin:
                     #     nforce = fin.read().count("TOTAL-FORCE")
                     # # dlog.info("nforce is", nforce)
@@ -293,7 +291,6 @@ def coll_gpaw_md(jdata):
                     #     dlog.info(
                     #         f"WARNING : in directory {os.getcwd()} nforce in OUTCAR is not equal to settings in INCAR"
                     #     )
-
 
         if len(valid_trajs) == 0:
             raise RuntimeError(
@@ -308,7 +305,7 @@ def coll_gpaw_md(jdata):
         for i, file in enumerate(valid_trajs):
             _sys = dpdata.LabeledSystem(file, fmt="ase/traj", type_map=type_map)
             if len(_sys) > 0:
-                if i==0:
+                if i == 0:
                     all_sys = _sys    # initialize the all_sys
                 else:
                     all_sys.append(_sys)
@@ -328,6 +325,8 @@ def coll_gpaw_md(jdata):
     return
 
 ##### ANCHOR: Support functions
+
+
 def check_gpaw_input(input_file: str) -> None:
     """
     Check the input files for the GPAW calculation, to ensure some necessary fields are set.
@@ -345,6 +344,7 @@ def check_gpaw_input(input_file: str) -> None:
             f"The GPAW input file {input_file} did not output the trajectory file 'CONF_ASE.traj'. It should be set for backward files."
         )
     return
+
 
 def check_valid_ASEtraj():
     """check if the ASE trajectory is valid for the deepmd data generation. It should contain the forces, energies, and stress."""
