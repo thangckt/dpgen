@@ -145,8 +145,6 @@ def pert_scaled_gpaw(jdata):
 
             ### Loop over each perturbation
             for kk in range(pert_numb):
-                # pos_in = f"POSCAR{(kk + 1)}.vasp"
-                # dir_out = f"{(kk + 1):06d}"
                 pos_in = f"POSCAR{kk}.vasp"
                 dir_out = f"{kk:06d}"
                 create_path(dir_out)
@@ -156,17 +154,6 @@ def pert_scaled_gpaw(jdata):
                 else:
                     shutil.copy2(pos_in, pos_out)
                 os.remove(pos_in)
-
-            ### Handle the special case
-            # kk = -1
-            # pos_in = "POSCAR"
-            # dir_out = f"{(kk + 1):06d}"
-            # create_path(dir_out)
-            # pos_out = os.path.join(dir_out, "POSCAR")
-            # if not from_poscar:
-            #     poscar_shuffle(pos_in, pos_out)
-            # else:
-            #     shutil.copy2(pos_in, pos_out)
 
             os.chdir(cwd)
     return
