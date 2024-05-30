@@ -12,6 +12,7 @@ import dpdata
 from ase.io import Trajectory
 from ase.io.vasp import write_vasp
 
+from dpgen import  dlog
 from dpgen.dispatcher.Dispatcher import make_submission
 from dpgen.generator.lib.utils import symlink_user_forward_files, check_api_version
 
@@ -256,6 +257,7 @@ def coll_gpaw_md(jdata):
     pert_numb = jdata["pert_numb"]
     coll_ndata = jdata["coll_ndata"]
 
+    ### Get the current working directory and the system path
     cwd = os.getcwd()
     path_md = os.path.join(out_dir, global_dirname_04)
     path_md = os.path.abspath(path_md)
@@ -264,6 +266,7 @@ def coll_gpaw_md(jdata):
     sys_md = glob.glob("sys-*")
     sys_md.sort()
 
+    ### Loop over each system, scale, and perturbation number
     for ii in sys_md:
         os.chdir(ii)
         # convert outcars
@@ -271,6 +274,8 @@ def coll_gpaw_md(jdata):
         for jj in scale:
             for kk in range(pert_numb):
                 path_work = os.path.join(f"scale-{jj:.3f}", f"{kk:06d}")
+
+
                 outcar = os.path.join(path_work, "OUTCAR")
                 # dlog.info("OUTCAR",outcar)
                 if os.path.isfile(outcar):
@@ -299,6 +304,7 @@ def coll_gpaw_md(jdata):
             type_map = jdata["type_map"]
         else:
             type_map = None
+
         for oo in valid_outcars:
             if flag:
                 _sys = dpdata.LabeledSystem(oo, type_map=type_map)
