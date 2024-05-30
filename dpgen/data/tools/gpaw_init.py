@@ -60,13 +60,13 @@ def make_gpaw_relax(jdata, mdata):
         work_path=os.path.join(os.path.basename(out_dir), global_dirname_02),
         task_format={"fp": "sys-*"},
     )
-    return
+
 
 
 def run_gpaw_relax(jdata, mdata):
     check_gpaw_input(jdata["relax_incar"])
     gpaw_input_name = os.path.basename(jdata["relax_incar"])
-    fp_command = mdata["fp_command"] + gpaw_input_name
+    fp_command = mdata["fp_command"] + f" {gpaw_input_name}"
     work_dir = os.path.join(jdata["out_dir"], global_dirname_02)
 
     forward_files = ["POSCAR", gpaw_input_name]
@@ -153,7 +153,7 @@ def pert_scaled_gpaw(jdata):
                 os.remove(pos_in)
 
             os.chdir(cwd)
-    return
+
 
 
 ##### ANCHOR: Stage 3 - run AIMD
@@ -203,13 +203,13 @@ def make_gpaw_md(jdata, mdata):
         work_path=os.path.join(os.path.basename(out_dir), global_dirname_04),
         task_format={"fp": "sys-*/scale*/00*"},
     )
-    return
+
 
 
 def run_gpaw_md(jdata, mdata):
     check_gpaw_input(jdata["md_incar"])
     gpaw_input_name = os.path.basename(jdata["md_incar"])
-    fp_command = mdata["fp_command"] + gpaw_input_name
+    fp_command = mdata["fp_command"] + f" {gpaw_input_name}"
     work_dir = os.path.join(jdata["out_dir"], global_dirname_04)
 
     forward_files = ["POSCAR", gpaw_input_name]
