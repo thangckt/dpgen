@@ -11,7 +11,6 @@ import sys
 import dpdata
 from ase.io import Trajectory
 from ase.io.vasp import write_vasp
-from packaging.version import Version
 
 from dpgen.dispatcher.Dispatcher import make_submission
 from dpgen.generator.lib.utils import symlink_user_forward_files, check_api_version
@@ -79,8 +78,6 @@ def run_gpaw_relax(jdata, mdata):
 
     relax_tasks = glob.glob(os.path.join(work_dir, "sys-*"))
     relax_tasks.sort()
-    # dlog.info("work_dir",work_dir)
-    # dlog.info("relax_tasks",relax_tasks)
     if len(relax_tasks) == 0:
         return
 
