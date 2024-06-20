@@ -618,6 +618,3 @@ def gen_simplify(args):
         dlog.info("start simplifying")
         run_iter(args.PARAM, args.MACHINE)
         dlog.info("finished")
-
-
-#
