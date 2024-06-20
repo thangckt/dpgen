@@ -3,32 +3,38 @@
 - functions for `run.py`
 """
 
-
-import os
 import glob
+import os
 from pathlib import Path
 
-from dargs import Argument
-from dpgen.generator.lib.utils import make_iter_name
-from dpgen.util import set_directory
 import dpdata
 import numpy as np
+from dargs import Argument
+
+from dpgen.generator.lib.utils import make_iter_name
+from dpgen.util import set_directory
+
+from ..run import fp_name
+
+# fp_name = "02.fp"
 
 
-### functinos for `arginfo.py`
+### ANCHOR functions for `arginfo.py`
 def fp_style_gpaw_args() -> list[Argument]:
-    args = [Argument("fp_gpaw_runfile",
-                     str,
-                     optional=True,
-                     default="gpaw_singlepoint.py",
-                     doc="Input file to run GPAW.",
-                     )
-            ]
+    args = [
+        Argument(
+            "fp_gpaw_runfile",
+            str,
+            optional=True,
+            default="gpaw_singlepoint.py",
+            doc="Input file to run GPAW.",
+        )
+    ]
     return args
 
 
-### functions for `run.py`
-def make_fp_gpaw(iter_index, jdata, fp_name):
+### ANCHOR functions for `run.py`
+def make_fp_gpaw(iter_index, jdata):
     """Make input file for customized FP style.
 
     Parameters
@@ -52,7 +58,7 @@ def make_fp_gpaw(iter_index, jdata, fp_name):
             Path(gpaw_runfile).symlink_to(gpaw_runfile_source)
 
 
-def post_fp_gpaw(iter_index, jdata, fp_name):
+def post_fp_gpaw(iter_index, jdata):
     """Post fp for custom fp. Collect data from user-defined `output_fn`.
 
     Parameters
@@ -80,7 +86,7 @@ def post_fp_gpaw(iter_index, jdata, fp_name):
     system_index = list(set_tmp)
     system_index.sort()
 
-    output_fn = "conf_ase.traj"
+    output_fn = "CONF_ASE.traj"
     output_fmt = "ase/traj"
 
     for ss in system_index:

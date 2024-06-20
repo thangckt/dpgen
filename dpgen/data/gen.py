@@ -726,8 +726,7 @@ def make_scale_ABACUS(jdata):
 
 
 def pert_scaled(jdata):
-    if "init_fp_style" not in jdata:
-        jdata["init_fp_style"] = "VASP"
+    ### Extract data from jdata
     out_dir = jdata["out_dir"]
     scale = jdata["scale"]
     pert_box = jdata["pert_box"]
@@ -744,6 +743,7 @@ def pert_scaled(jdata):
     if "from_poscar" in jdata:
         from_poscar = jdata["from_poscar"]
 
+    ### Get the current working directory and the system path
     cwd = os.getcwd()
     path_sp = os.path.join(out_dir, global_dirname_03)
     assert os.path.isdir(path_sp)
@@ -752,35 +752,38 @@ def pert_scaled(jdata):
     sys_pe.sort()
     os.chdir(cwd)
 
-    pert_cmd = os.path.dirname(__file__)
-    pert_cmd = os.path.join(pert_cmd, "tools")
-    pert_cmd = os.path.join(pert_cmd, "create_random_disturb.py")
-    fp_style = "vasp"
-    poscar_name = "POSCAR"
-    if jdata["init_fp_style"] == "ABACUS":
+    ### Construct the perturbation command
+    init_fp_style = jdata.get("init_fp_style", "VASP")
+    if init_fp_style == "VASP":
+        fp_style = "vasp"
+        poscar_name = "POSCAR"
+    elif init_fp_style == "ABACUS":
         fp_style = "abacus"
         poscar_name = "STRU"
+
+    python_exec = os.path.join(
+        os.path.dirname(__file__), "tools", "create_random_disturb.py"
+    )
     pert_cmd = (
         sys.executable
-        + " "
-        + pert_cmd
-        + " -etmax %f -ofmt %s %s %d %f > /dev/null"
-        % (pert_box, fp_style, poscar_name, pert_numb, pert_atom)
+        + f" {python_exec} -etmax {pert_box} -ofmt {fp_style} {poscar_name} {pert_numb} {pert_atom} > /dev/null"
     )
+
+    ### Loop over each system and scale
     for ii in sys_pe:
         for jj in scale:
-            path_work = path_sp
-            path_work = os.path.join(path_work, ii)
-            path_work = os.path.join(path_work, f"scale-{jj:.3f}")
+            path_work = os.path.join(path_sp, ii, f"scale-{jj:.3f}")
             assert os.path.isdir(path_work)
             os.chdir(path_work)
             sp.check_call(pert_cmd, shell=True)
+
+            ### Loop over each perturbation
             for kk in range(pert_numb):
                 if fp_style == "vasp":
-                    pos_in = "POSCAR%d.vasp" % (kk + 1)
+                    pos_in = f"POSCAR{kk+1}.vasp"
                 elif fp_style == "abacus":
-                    pos_in = "STRU%d.abacus" % (kk + 1)
-                dir_out = "%06d" % (kk + 1)
+                    pos_in = f"STRU{kk+1}.abacus"
+                dir_out = f"{kk+1:06d}"
                 create_path(dir_out)
                 if fp_style == "vasp":
                     pos_out = os.path.join(dir_out, "POSCAR")
@@ -805,12 +808,14 @@ def pert_scaled(jdata):
                 else:
                     shutil.copy2(pos_in, pos_out)
                 os.remove(pos_in)
+
+            ### Handle special case (unperturbed ?)
             kk = -1
             if fp_style == "vasp":
                 pos_in = "POSCAR"
             elif fp_style == "abacus":
                 pos_in = "STRU"
-            dir_out = "%06d" % (kk + 1)
+            dir_out = f"{kk+1:06d}"
             create_path(dir_out)
             if fp_style == "vasp":
                 pos_out = os.path.join(dir_out, "POSCAR")
@@ -1443,6 +1448,17 @@ def run_abacus_md(jdata, mdata):
     submission.run_submission()
 
 
+from dpgen.data.tools.gpaw_init import (
+    coll_gpaw_md,
+    make_gpaw_md,
+    make_gpaw_relax,
+    pert_scaled_gpaw,
+    run_gpaw_md,
+    run_gpaw_relax,
+)
+
+
+
 def gen_init_bulk(args):
     jdata = load_file(args.PARAM)
     if args.MACHINE is not None:
@@ -1458,7 +1474,7 @@ def gen_init_bulk(args):
     # Decide whether to use a given poscar
     from_poscar = jdata.get("from_poscar", False)
     # Verify md_nstep
-    md_nstep_jdata = jdata["md_nstep"]
+    md_nstep_jdata = jdata.get("md_nstep", None)
     if "init_fp_style" not in jdata:
         jdata["init_fp_style"] = "VASP"
     try:
@@ -1480,6 +1496,9 @@ def gen_init_bulk(args):
                 if "md_nstep" in standard_incar:
                     nsw_flag = True
                     nsw_steps = int(standard_incar["md_nstep"])
+            elif jdata["init_fp_style"] == "GPAW":
+                nsw_flag = False  # set md_nstep in gpaw_input
+
             if nsw_flag:
                 if nsw_steps != md_nstep_jdata:
                     dlog.info(
@@ -1506,12 +1525,12 @@ def gen_init_bulk(args):
             create_path(out_dir)
             shutil.copy2(args.PARAM, os.path.join(out_dir, "param.json"))
             if from_poscar:
-                if jdata["init_fp_style"] == "VASP":
+                if jdata["init_fp_style"] == "VASP" or jdata["init_fp_style"] == "GPAW":
                     make_super_cell_poscar(jdata)
                 elif jdata["init_fp_style"] == "ABACUS":
                     make_super_cell_STRU(jdata)
             else:
-                if jdata["init_fp_style"] == "VASP":
+                if jdata["init_fp_style"] == "VASP" or jdata["init_fp_style"] == "GPAW":
                     make_unit_cell(jdata)
                     make_super_cell(jdata)
                     place_element(jdata)
@@ -1526,11 +1545,16 @@ def gen_init_bulk(args):
                 elif jdata["init_fp_style"] == "ABACUS":
                     make_abacus_relax(jdata, mdata)
                     run_abacus_relax(jdata, mdata)
+                elif jdata["init_fp_style"] == "GPAW":
+                    make_gpaw_relax(jdata, mdata)
+                    run_gpaw_relax(jdata, mdata)
             else:
                 if jdata["init_fp_style"] == "VASP":
                     make_vasp_relax(jdata, {"fp_resources": {}})
                 elif jdata["init_fp_style"] == "ABACUS":
                     make_abacus_relax(jdata, {"fp_resources": {}})
+                elif jdata["init_fp_style"] == "GPAW":
+                    make_gpaw_relax(jdata, {"fp_resources": {}})
         elif stage == 2:
             dlog.info("Current stage is 2, perturb and scale")
             if jdata["init_fp_style"] == "VASP":
@@ -1539,6 +1563,9 @@ def gen_init_bulk(args):
             elif jdata["init_fp_style"] == "ABACUS":
                 make_scale_ABACUS(jdata)
                 pert_scaled(jdata)
+            elif jdata["init_fp_style"] == "GPAW":
+                make_scale(jdata)
+                pert_scaled_gpaw(jdata)
         elif stage == 3:
             dlog.info("Current stage is 3, run a short md")
             if args.MACHINE is not None:
@@ -1548,11 +1575,16 @@ def gen_init_bulk(args):
                 elif jdata["init_fp_style"] == "ABACUS":
                     make_abacus_md(jdata, mdata)
                     run_abacus_md(jdata, mdata)
+                elif jdata["init_fp_style"] == "GPAW":
+                    make_gpaw_md(jdata, mdata)
+                    run_gpaw_md(jdata, mdata)
             else:
                 if jdata["init_fp_style"] == "VASP":
                     make_vasp_md(jdata, {"fp_resources": {}})
                 elif jdata["init_fp_style"] == "ABACUS":
                     make_abacus_md(jdata, {"fp_resources": {}})
+                elif jdata["init_fp_style"] == "GPAW":
+                    make_gpaw_md(jdata, {"fp_resources": {}})
 
         elif stage == 4:
             dlog.info("Current stage is 4, collect data")
@@ -1560,6 +1592,8 @@ def gen_init_bulk(args):
                 coll_vasp_md(jdata)
             elif jdata["init_fp_style"] == "ABACUS":
                 coll_abacus_md(jdata)
+            elif jdata["init_fp_style"] == "GPAW":
+                coll_gpaw_md(jdata)
         else:
             raise RuntimeError("unknown stage %d" % stage)
 
