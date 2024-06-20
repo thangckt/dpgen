@@ -1458,6 +1458,7 @@ from dpgen.data.tools.gpaw_init import (
 )
 
 
+
 def gen_init_bulk(args):
     jdata = load_file(args.PARAM)
     if args.MACHINE is not None:
