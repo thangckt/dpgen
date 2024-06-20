@@ -23,7 +23,7 @@ import dpgen.data.tools.diamond as diamond
 import dpgen.data.tools.fcc as fcc
 import dpgen.data.tools.hcp as hcp
 import dpgen.data.tools.sc as sc
-from dpgen import ROOT_PATH, dlog
+from dpgen import dlog
 from dpgen.dispatcher.Dispatcher import make_submission_compat
 from dpgen.generator.lib.utils import symlink_user_forward_files
 from dpgen.remote.decide_machine import convert_mdata
@@ -520,13 +520,23 @@ def pert_scaled(jdata):
                 os.chdir(path_elong)
                 poscar_elong(poscar_in, "POSCAR", ll)
                 sp.run(pert_cmd, shell=True)
+                ### Loop over each perturbation
                 for kk in range(pert_numb):
-                    pos_in = f"POSCAR{kk}.vasp"
-                    dir_out = f"{kk:06d}"
+                    pos_in = f"POSCAR{kk+1}.vasp"
+                    dir_out = f"{kk+1:06d}"
                     create_path(dir_out)
                     pos_out = os.path.join(dir_out, "POSCAR")
                     poscar_shuffle(pos_in, pos_out)
                     os.remove(pos_in)
+
+                ### Handle special case (unperturbed ?)
+                kk = -1
+                pos_in = "POSCAR"
+                dir_out = f"{kk+1:06d}"
+                create_path(dir_out)
+                pos_out = os.path.join(dir_out, "POSCAR")
+                poscar_shuffle(pos_in, pos_out)
+
                 os.chdir(cwd)
 
 
@@ -590,6 +600,7 @@ def run_vasp_relax(jdata, mdata):
         backward_files,
         api_version=mdata.get("api_version", "0.9"),
     )
+
 
 from dpgen.data.tools.gpaw_init import (
     coll_gpaw_md,
