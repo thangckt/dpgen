@@ -49,7 +49,10 @@ def make_gpaw_relax(jdata, mdata):
     for ss in sys_list:
         os.chdir(ss)
         ln_src = os.path.relpath(gpaw_runfile_path)     # remmeber the base_file path
-        os.symlink(ln_src, gpaw_input_name)         # create a symlink (has name: gpaw_input_name) to the base_file
+        ### create a symlink (has name: gpaw_input_name) to the base_file
+        if os.path.exists(gpaw_input_name) or os.path.islink(gpaw_input_name):
+            os.remove(gpaw_input_name)   # remove the existing file before creating the symlink
+        os.symlink(ln_src, gpaw_input_name)
         os.chdir(work_dir)
 
     os.chdir(cwd)
