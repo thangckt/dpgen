@@ -177,7 +177,7 @@ def make_gpaw_md(jdata, mdata):
     cwd = os.getcwd()
     path_ps = os.path.join(out_dir, global_dirname_03)
     path_ps = os.path.abspath(path_ps)
-    assert os.path.isdir(path_ps)
+    assert os.path.isdir(path_ps), f"{path_ps} path does not exists. Check the previous stages."
     os.chdir(path_ps)
     sys_ps = glob.glob("sys-*")
     sys_ps.sort()
