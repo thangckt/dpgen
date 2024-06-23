@@ -49,7 +49,7 @@ def make_gpaw_relax(jdata, mdata):
     for ss in sys_list:
         os.chdir(ss)
         ln_src = os.path.relpath(gpaw_runfile_path)     # remmeber the base_file path
-        _symlink_force(ln_src, gpaw_input_name)  # create a symlink (has name: gpaw_input_name) to the base_file
+        _force_symlink(ln_src, gpaw_input_name)  # create a symlink (has name: gpaw_input_name) to the `ln_src`
         os.chdir(work_dir)
 
     os.chdir(cwd)
@@ -96,7 +96,7 @@ def run_gpaw_relax(jdata, mdata):
         forward_files=forward_files,
         backward_files=backward_files,
         outlog="fp.log",
-        errlog="fp.log",
+        errlog="fp.err",
     )
     submission.run_submission()
 
@@ -202,7 +202,7 @@ def make_gpaw_md(jdata, mdata):
                 path_pos = os.path.join(path_ps, ii, f"scale-{jj:.3f}", f"{kk:06d}")
                 init_pos = os.path.join(path_pos, "POSCAR")
                 shutil.copy2(init_pos, "POSCAR")
-                _symlink_force(os.path.relpath(gpaw_runfile_path), gpaw_input_name)
+                _force_symlink(os.path.relpath(gpaw_runfile_path), gpaw_input_name)
                 os.chdir(cwd)
 
     symlink_user_forward_files(
@@ -251,7 +251,7 @@ def run_gpaw_md(jdata, mdata):
         forward_files=forward_files,
         backward_files=backward_files,
         outlog="fp.log",
-        errlog="fp.log",
+        errlog="fp.err",
     )
     submission.run_submission()
 
@@ -350,7 +350,7 @@ def check_gpaw_input(input_file: str) -> None:
 #     return
 
 
-def _symlink_force(src_path, dest_path, override=True):
+def _force_symlink(src_path, dest_path, override=True):
     """Create a symbolic link named `dest_path` pointing to `src_path`.
     If link_name exists then `FileExistsError` is raised, unless override=True."""
     try:
