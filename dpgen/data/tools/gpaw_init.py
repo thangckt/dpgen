@@ -4,9 +4,9 @@ NOTE: do not use `return` in the functions that run dpdispatcher.submission
 
 import glob
 import os
+import sys
 import shutil
 import subprocess as sp
-import sys
 
 import dpdata
 from ase.io import Trajectory
@@ -49,10 +49,7 @@ def make_gpaw_relax(jdata, mdata):
     for ss in sys_list:
         os.chdir(ss)
         ln_src = os.path.relpath(gpaw_runfile_path)     # remmeber the base_file path
-        ### create a symlink (has name: gpaw_input_name) to the base_file
-        if os.path.exists(gpaw_input_name) or os.path.islink(gpaw_input_name):
-            os.remove(gpaw_input_name)   # remove the existing file before creating the symlink
-        os.symlink(ln_src, gpaw_input_name)
+        _symlink_force(ln_src, gpaw_input_name)  # create a symlink (has name: gpaw_input_name) to the base_file
         os.chdir(work_dir)
 
     os.chdir(cwd)
@@ -205,10 +202,7 @@ def make_gpaw_md(jdata, mdata):
                 path_pos = os.path.join(path_ps, ii, f"scale-{jj:.3f}", f"{kk:06d}")
                 init_pos = os.path.join(path_pos, "POSCAR")
                 shutil.copy2(init_pos, "POSCAR")
-                try:
-                    os.symlink(os.path.relpath(gpaw_runfile_path), gpaw_input_name)
-                except FileExistsError:
-                    pass
+                _symlink_force(os.path.relpath(gpaw_runfile_path), gpaw_input_name)
                 os.chdir(cwd)
 
     symlink_user_forward_files(
@@ -354,3 +348,17 @@ def check_gpaw_input(input_file: str) -> None:
 # def check_valid_ASEtraj():
 #     """check if the ASE trajectory is valid for the deepmd data generation. It should contain the forces, energies, and stress."""
 #     return
+
+
+def _symlink_force(src_path, dest_path, override=True):
+    """Create a symbolic link named `dest_path` pointing to `src_path`.
+    If link_name exists then `FileExistsError` is raised, unless override=True."""
+    try:
+        os.symlink(src_path, dest_path)
+    except FileExistsError:
+        if override:
+            os.remove(dest_path)
+            os.symlink(src_path, dest_path)
+        else:
+            raise
+    return
