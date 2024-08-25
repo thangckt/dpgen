@@ -1,4 +1,4 @@
-"""NOTE: do not use `return` in the functions that run dpdispatcher.submission"""
+"""NOTE: do not use `return` in the functions that run `dpdispatcher.submission()`."""
 
 import glob
 import os
@@ -339,9 +339,7 @@ def coll_gpaw_md(jdata):
 
 
 def check_gpaw_input(input_file: str) -> None:
-    """
-    Check the input files for the GPAW calculation, to ensure some necessary fields are set.
-    """
+    """Check the input files for the GPAW calculation, to ensure some necessary fields are set."""
     with open(input_file) as f:
         text = f.read()
 
