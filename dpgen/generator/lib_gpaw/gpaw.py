@@ -1,6 +1,6 @@
 """Move all the GPAW related functions to here.
 - functions for `arginfo.py`
-- functions for `run.py`
+- functions for `run.py`.
 """
 
 import glob
@@ -12,11 +12,8 @@ import numpy as np
 from dargs import Argument
 
 from dpgen.generator.lib.utils import make_iter_name
+from dpgen.generator.run import fp_name  # fp_name = "02.fp"
 from dpgen.util import set_directory
-
-from ..run import fp_name
-
-# fp_name = "02.fp"
 
 
 ### ANCHOR functions for `arginfo.py`
@@ -26,9 +23,16 @@ def fp_style_gpaw_args() -> list[Argument]:
             "fp_gpaw_runfile",
             str,
             optional=True,
-            default="gpaw_singlepoint.py",
+            default=str(Path(__file__).parent / "cli_gpaw_singlepoint.py"),
             doc="Input file to run GPAW.",
-        )
+        ),
+        Argument(
+            "fp_gpaw_cli_args",
+            str,
+            optional=True,
+            default="",
+            doc="CLI arguments for GPAW.",
+        ),
     ]
     return args
 
@@ -48,14 +52,14 @@ def make_fp_gpaw(iter_index, jdata):
     work_path = os.path.join(make_iter_name(iter_index), fp_name)
     fp_tasks = glob.glob(os.path.join(work_path, "task.*"))
     gpaw_runfile = jdata["fp_gpaw_runfile"]
-    gpaw_runfile_source = Path(gpaw_runfile).resolve()
+    gpaw_runfile_origin = Path(gpaw_runfile).resolve()
     assert os.path.exists(
-        gpaw_runfile_source
-    ), f"Can not find gpaw runfile {gpaw_runfile_source}"
+        gpaw_runfile_origin
+    ), f"Can not find gpaw runfile {gpaw_runfile_origin}"
     for ii in fp_tasks:
         with set_directory(Path(ii)):
             # create file `gpaw_runfile` in the current directory and symlink it to the source file
-            Path(gpaw_runfile).symlink_to(gpaw_runfile_source)
+            Path(gpaw_runfile).symlink_to(gpaw_runfile_origin)
 
 
 def post_fp_gpaw(iter_index, jdata):
@@ -86,7 +90,7 @@ def post_fp_gpaw(iter_index, jdata):
     system_index = list(set_tmp)
     system_index.sort()
 
-    output_fn = "CONF_ASE.traj"
+    output_fn = "CONF.asetraj"
     output_fmt = "ase/traj"
 
     for ss in system_index:

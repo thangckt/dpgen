@@ -122,8 +122,9 @@ calypso_run_model_devi_file = os.path.join(
 check_outcar_file = os.path.join(ROOT_PATH, "generator/lib/calypso_check_outcar.py")
 run_opt_file = os.path.join(ROOT_PATH, "generator/lib/calypso_run_opt.py")
 
+from dpgen.generator.lib_gpaw.gpaw import make_fp_gpaw, post_fp_gpaw
+
 from .arginfo import run_jdata_arginfo
-from dpgen.generator.lib.gpaw import (make_fp_gpaw, post_fp_gpaw)
 
 
 def _get_model_suffix(jdata) -> str:
@@ -3972,7 +3973,7 @@ def run_fp_inner(
             ).format(jdata["cutoff"])
         )
     if fp_style == "gpaw":
-        fp_command = f"{fp_command} {jdata.get('fp_gpaw_runfile')}"
+        fp_command = f"{fp_command} {jdata.get('fp_gpaw_runfile')} {jdata.get('fp_gpaw_cli_args')}"
 
     fp_run_tasks = fp_tasks
     # for ii in fp_tasks :
@@ -4155,7 +4156,7 @@ def run_fp(iter_index, jdata, mdata):
     elif fp_style == "gpaw":
         gpaw_runfile = jdata["fp_gpaw_runfile"]
         forward_files = ["POSCAR", gpaw_runfile]
-        backward_files = ["CONF_ASE.traj", "calc.txt", "fp.log"]
+        backward_files = ["CONF.asetraj", "calc*.txt", "fp.log"]
         run_fp_inner(
             iter_index,
             jdata,

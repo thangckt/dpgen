@@ -1,21 +1,19 @@
-"""
-NOTE: do not use `return` in the functions that run dpdispatcher.submission
-"""
+"""NOTE: do not use `return` in the functions that run dpdispatcher.submission"""
 
 import glob
 import os
-import sys
 import shutil
 import subprocess as sp
+import sys
 
 import dpdata
+import numpy as np
 from ase.io import Trajectory
 from ase.io.vasp import write_vasp
-import numpy as np
 
 from dpgen import dlog
 from dpgen.dispatcher.Dispatcher import make_submission
-from dpgen.generator.lib.utils import symlink_user_forward_files, check_api_version
+from dpgen.generator.lib.utils import check_api_version, symlink_user_forward_files
 
 ### use from...import... may cause circular import. To avoid this, functions in `gen` file must be defined before importing `gpaw_init`
 from ..gen import (
@@ -39,17 +37,25 @@ def make_gpaw_relax(jdata, mdata):
     assert os.path.isdir(work_dir)
     work_dir = os.path.abspath(work_dir)
 
-    gpaw_input_name = os.path.basename(jdata["relax_incar"])        # file_name set in the .param file (only name, not path)
-    gpaw_runfile_path = os.path.join(work_dir, gpaw_input_name)     # file_path is generated in work_dir
-    shutil.copy2(jdata["relax_incar"], gpaw_runfile_path)           # copy the gpaw_input_name to the work_dir, now called "base_file"
+    gpaw_input_name = os.path.basename(
+        jdata["relax_incar"]
+    )  # file_name set in the .param file (only name, not path)
+    gpaw_runfile_path = os.path.join(
+        work_dir, gpaw_input_name
+    )  # file_path is generated in work_dir
+    shutil.copy2(
+        jdata["relax_incar"], gpaw_runfile_path
+    )  # copy the gpaw_input_name to the work_dir, now called "base_file"
 
     ### Generate symlinks for GPAW input files
     os.chdir(work_dir)
     sys_list = glob.glob("sys-*")
     for ss in sys_list:
         os.chdir(ss)
-        ln_src = os.path.relpath(gpaw_runfile_path)     # remmeber the base_file path
-        _force_symlink(ln_src, gpaw_input_name)  # create a symlink (has name: gpaw_input_name) to the `ln_src`
+        ln_src = os.path.relpath(gpaw_runfile_path)  # remmeber the base_file path
+        _force_symlink(
+            ln_src, gpaw_input_name
+        )  # create a symlink (has name: gpaw_input_name) to the `ln_src`
         os.chdir(work_dir)
 
     os.chdir(cwd)
@@ -130,7 +136,10 @@ def pert_scaled_gpaw(jdata):
 
     ### Construct the perturbation command (note: current file is already in the tools directory)
     python_exec = os.path.join(os.path.dirname(__file__), "create_random_disturb.py")
-    pert_cmd = sys.executable + f" {python_exec} -etmax {pert_box} -ofmt vasp POSCAR {pert_numb} {pert_atom} > /dev/null"
+    pert_cmd = (
+        sys.executable
+        + f" {python_exec} -etmax {pert_box} -ofmt vasp POSCAR {pert_numb} {pert_atom} > /dev/null"
+    )
 
     ### Loop over each system and scale
     for ii in sys_pe:
@@ -177,7 +186,9 @@ def make_gpaw_md(jdata, mdata):
     cwd = os.getcwd()
     path_ps = os.path.join(out_dir, global_dirname_03)
     path_ps = os.path.abspath(path_ps)
-    assert os.path.isdir(path_ps), f"{path_ps} path does not exists. Check the previous stages."
+    assert os.path.isdir(
+        path_ps
+    ), f"{path_ps} path does not exists. Check the previous stages."
     os.chdir(path_ps)
     sys_ps = glob.glob("sys-*")
     sys_ps.sort()
@@ -298,7 +309,7 @@ def coll_gpaw_md(jdata):
             _sys = dpdata.LabeledSystem(file, fmt="ase/traj", type_map=type_map)
             if len(_sys) > 0:
                 if i == 0:
-                    all_sys = _sys    # initialize the all_sys
+                    all_sys = _sys  # initialize the all_sys
                 else:
                     all_sys.append(_sys)
 
@@ -322,6 +333,7 @@ def coll_gpaw_md(jdata):
         os.chdir(path_md)
     os.chdir(cwd)
     return
+
 
 ##### ANCHOR: Support functions
 
@@ -352,7 +364,8 @@ def check_gpaw_input(input_file: str) -> None:
 
 def _force_symlink(src_path, dest_path, override=True):
     """Create a symbolic link named `dest_path` pointing to `src_path`.
-    If link_name exists then `FileExistsError` is raised, unless override=True."""
+    If link_name exists then `FileExistsError` is raised, unless override=True.
+    """
     try:
         os.symlink(src_path, dest_path)
     except FileExistsError:

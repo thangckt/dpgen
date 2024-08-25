@@ -4,7 +4,7 @@ from typing import Union
 from dargs import Argument, Variant
 
 from dpgen.arginfo import general_mdata_arginfo
-from dpgen.generator.lib.gpaw import fp_style_gpaw_args
+from dpgen.generator.lib_gpaw.gpaw import fp_style_gpaw_args
 
 
 def run_mdata_arginfo() -> Argument:
