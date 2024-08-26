@@ -11,13 +11,12 @@ import dpdata
 import numpy as np
 from ase.io import Trajectory
 from ase.io.vasp import write_vasp
+from dargs import Argument
 
 from dpgen import dlog
-from dpgen.dispatcher.Dispatcher import make_submission
-from dpgen.generator.lib.utils import check_api_version, symlink_user_forward_files
 
 ### use from...import... may cause circular import. To avoid this, functions in `gen` file must be defined before importing `gpaw_init`
-from ..gen import (
+from dpgen.data.gen import (
     create_path,
     global_dirname_02,
     global_dirname_03,
@@ -28,6 +27,30 @@ from ..gen import (
 # global_dirname_02 = "00.place_ele"
 # global_dirname_03 = "01.scale_pert"
 # global_dirname_04 = "02.md"
+from dpgen.dispatcher.Dispatcher import make_submission
+from dpgen.generator.lib.utils import check_api_version, symlink_user_forward_files
+from dpgen.generator.lib_gpaw.gpaw import GPAW_LIB_PATH
+
+
+### ANCHOR functions for `arginfo.py`
+def init_bulk_gpaw_args() -> list[Argument]:
+    args = [
+        Argument(
+            "gpaw_optimize",
+            str,
+            optional=True,
+            default=str(GPAW_LIB_PATH / "cli_gpaw_optimize.py"),
+            doc="Input file to run optimization (similar to md_relax in VASP).",
+        ),
+        Argument(
+            "gpaw_aimd",
+            str,
+            optional=True,
+            default=str(GPAW_LIB_PATH / "cli_gpaw_aimd.py"),
+            doc="Input file to run AIMD (similar to md in VASP).",
+        ),
+    ]
+    return args
 
 
 ##### ANCHOR: Stage 1 - Geometry Optimization/ relaxation
