@@ -27,7 +27,10 @@ parser.add_argument("--fmax", type=float, default=0.05, help="max force for conv
 parser.add_argument("--ecutoff", type=float, default=550, help="PW energy cutoff")
 parser.add_argument("--kdensity", type=float, default=19, help="k-point density")
 parser.add_argument(
-    "--pbc", type=str, default="1 1 1", help="periodic boundary condition. E.g., --pbc '1 1 0'"
+    "--pbc",
+    type=str,
+    default="1 1 1",
+    help="periodic boundary condition. E.g., --pbc '1 1 0'",
 )
 parser.add_argument(
     "--relax_dim",

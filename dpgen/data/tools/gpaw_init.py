@@ -2,6 +2,7 @@
 
 import glob
 import os
+import re
 import shutil
 import subprocess as sp
 import sys
@@ -37,15 +38,12 @@ def make_gpaw_relax(jdata, mdata):
     assert os.path.isdir(work_dir)
     work_dir = os.path.abspath(work_dir)
 
-    gpaw_input_name = os.path.basename(
-        jdata["relax_incar"]
-    )  # file_name set in the .param file (only name, not path)
-    gpaw_runfile_path = os.path.join(
-        work_dir, gpaw_input_name
-    )  # file_path is generated in work_dir
-    shutil.copy2(
-        jdata["relax_incar"], gpaw_runfile_path
-    )  # copy the gpaw_input_name to the work_dir, now called "base_file"
+    # file_name set in the .param file (only name, not path)
+    gpaw_runfile_name = os.path.basename(jdata["relax_incar"])
+    # file_path is generated in work_dir
+    gpaw_runfile_path = os.path.join(work_dir, gpaw_runfile_name)
+    # copy the gpaw_runfile_name to the work_dir, now called "base_file"
+    shutil.copy2(jdata["relax_incar"], gpaw_runfile_path)
 
     ### Generate symlinks for GPAW input files
     os.chdir(work_dir)
@@ -54,8 +52,8 @@ def make_gpaw_relax(jdata, mdata):
         os.chdir(ss)
         ln_src = os.path.relpath(gpaw_runfile_path)  # remmeber the base_file path
         _force_symlink(
-            ln_src, gpaw_input_name
-        )  # create a symlink (has name: gpaw_input_name) to the `ln_src`
+            ln_src, gpaw_runfile_name
+        )  # create a symlink (has name: gpaw_runfile_name) to the `ln_src`
         os.chdir(work_dir)
 
     os.chdir(cwd)
@@ -70,14 +68,14 @@ def make_gpaw_relax(jdata, mdata):
 
 def run_gpaw_relax(jdata, mdata):
     check_gpaw_input(jdata["relax_incar"])
-    gpaw_input_name = os.path.basename(jdata["relax_incar"])
-    fp_command = mdata["fp_command"] + f" {gpaw_input_name}"
+    gpaw_runfile_name = os.path.basename(jdata["relax_incar"])
+    fp_command = mdata["fp_command"] + f" {gpaw_runfile_name}"
     work_dir = os.path.join(jdata["out_dir"], global_dirname_02)
 
-    forward_files = ["POSCAR", gpaw_input_name]
+    forward_files = ["POSCAR", gpaw_runfile_name]
     user_forward_files = mdata.get("fp" + "_user_forward_files", [])
     forward_files += [os.path.basename(file) for file in user_forward_files]
-    backward_files = ["CONF_ASE.traj", "calc.txt", "fp.log"]
+    backward_files = ["CONF.asetraj", "calc.txt", "fp.log"]
     backward_files += mdata.get("fp" + "_user_backward_files", [])
     forward_common_files = []
 
@@ -106,10 +104,10 @@ def run_gpaw_relax(jdata, mdata):
     )
     submission.run_submission()
 
-    ### Convert `CONF_ASE.traj` to `CONTCAR` to be used in the next step
+    ### Convert `CONF.asetraj` to `CONTCAR` to be used in the next step
     for ii in relax_tasks:
-        if os.path.isfile(f"{ii}/CONF_ASE.traj"):
-            traj = Trajectory(f"{ii}/CONF_ASE.traj")
+        if os.path.isfile(f"{ii}/CONF.asetraj"):
+            traj = Trajectory(f"{ii}/CONF.asetraj")
             write_vasp(f"{ii}/CONTCAR", traj[-1])
     return
 
@@ -136,10 +134,7 @@ def pert_scaled_gpaw(jdata):
 
     ### Construct the perturbation command (note: current file is already in the tools directory)
     python_exec = os.path.join(os.path.dirname(__file__), "create_random_disturb.py")
-    pert_cmd = (
-        sys.executable
-        + f" {python_exec} -etmax {pert_box} -ofmt vasp POSCAR {pert_numb} {pert_atom} > /dev/null"
-    )
+    pert_cmd = f"{sys.executable} {python_exec} -etmax {pert_box} -ofmt vasp POSCAR {pert_numb} {pert_atom} > /dev/null"
 
     ### Loop over each system and scale
     for ii in sys_pe:
@@ -186,9 +181,7 @@ def make_gpaw_md(jdata, mdata):
     cwd = os.getcwd()
     path_ps = os.path.join(out_dir, global_dirname_03)
     path_ps = os.path.abspath(path_ps)
-    assert os.path.isdir(
-        path_ps
-    ), f"{path_ps} path does not exists. Check the previous stages."
+    assert os.path.isdir(path_ps), f"{path_ps} path does not exists. Check the previous stages."
     os.chdir(path_ps)
     sys_ps = glob.glob("sys-*")
     sys_ps.sort()
@@ -198,8 +191,8 @@ def make_gpaw_md(jdata, mdata):
     create_path(path_md)
 
     ### Copy the GPAW input file to the MD path
-    gpaw_input_name = os.path.basename(jdata["md_incar"])
-    gpaw_runfile_path = os.path.join(path_md, gpaw_input_name)
+    gpaw_runfile_name = os.path.basename(jdata["md_incar"])
+    gpaw_runfile_path = os.path.join(path_md, gpaw_runfile_name)
     shutil.copy2(jdata["md_incar"], gpaw_runfile_path)
 
     ### Loop over each system, scale, and perturbation number
@@ -213,7 +206,7 @@ def make_gpaw_md(jdata, mdata):
                 path_pos = os.path.join(path_ps, ii, f"scale-{jj:.3f}", f"{kk:06d}")
                 init_pos = os.path.join(path_pos, "POSCAR")
                 shutil.copy2(init_pos, "POSCAR")
-                _force_symlink(os.path.relpath(gpaw_runfile_path), gpaw_input_name)
+                _force_symlink(os.path.relpath(gpaw_runfile_path), gpaw_runfile_name)
                 os.chdir(cwd)
 
     symlink_user_forward_files(
@@ -227,14 +220,14 @@ def make_gpaw_md(jdata, mdata):
 
 def run_gpaw_md(jdata, mdata):
     check_gpaw_input(jdata["md_incar"])
-    gpaw_input_name = os.path.basename(jdata["md_incar"])
-    fp_command = mdata["fp_command"] + f" {gpaw_input_name}"
+    gpaw_runfile_name = os.path.basename(jdata["md_incar"])
+    fp_command = mdata["fp_command"] + f" {gpaw_runfile_name}"
     work_dir = os.path.join(jdata["out_dir"], global_dirname_04)
 
-    forward_files = ["POSCAR", gpaw_input_name]
+    forward_files = ["POSCAR", gpaw_runfile_name]
     user_forward_files = mdata.get("fp" + "_user_forward_files", [])
     forward_files += [os.path.basename(file) for file in user_forward_files]
-    backward_files = ["CONF_ASE.traj", "calc.txt", "fp.log"]
+    backward_files = ["CONF.asetraj", "calc.txt", "fp.log"]
     backward_files += mdata.get("fp" + "_user_backward_files", [])
     forward_common_files = []
 
@@ -291,7 +284,7 @@ def coll_gpaw_md(jdata):
         for jj in scale:
             for kk in range(pert_numb):
                 path_work = os.path.join(f"scale-{jj:.3f}", f"{kk:06d}")
-                traj_file = os.path.join(path_work, "CONF_ASE.traj")
+                traj_file = os.path.join(path_work, "CONF.asetraj")
                 if os.path.isfile(traj_file):
                     valid_trajs.append(traj_file)
 
@@ -343,14 +336,14 @@ def check_gpaw_input(input_file: str) -> None:
     with open(input_file) as f:
         text = f.read()
 
-    if "calc.txt" not in text:
+    if not re.search(r"calc.+[.txt]", text):
         raise ValueError(
-            f"The GPAW calculator in file {input_file} did not contain field: txt='calc.txt'. It should be set for backward files."
+            f"The GPAW calculator in file {input_file} did not contain field: txt='calc*.txt'. It should be set for backward files."
         )
 
-    if "CONF_ASE.traj" not in text:
+    if not re.search("CONF.asetraj", text):
         raise ValueError(
-            f"The GPAW input file {input_file} did not output the trajectory file 'CONF_ASE.traj'. It should be set for backward files."
+            f"The GPAW input file {input_file} did not output the trajectory file 'CONF.asetraj'. It should be set for backward files."
         )
     return
 

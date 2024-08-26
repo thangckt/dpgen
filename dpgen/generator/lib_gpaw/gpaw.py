@@ -15,6 +15,8 @@ from dpgen.generator.lib.utils import make_iter_name
 from dpgen.generator.run import fp_name  # fp_name = "02.fp"
 from dpgen.util import set_directory
 
+GPAW_LIB_PATH = Path(__file__).parent
+
 
 ### ANCHOR functions for `arginfo.py`
 def fp_style_gpaw_args() -> list[Argument]:
@@ -23,7 +25,7 @@ def fp_style_gpaw_args() -> list[Argument]:
             "fp_gpaw_runfile",
             str,
             optional=True,
-            default=str(Path(__file__).parent / "cli_gpaw_singlepoint.py"),
+            default=str(GPAW_LIB_PATH / "cli_gpaw_singlepoint.py"),
             doc="Input file to run GPAW.",
         ),
         Argument(
@@ -53,9 +55,7 @@ def make_fp_gpaw(iter_index, jdata):
     fp_tasks = glob.glob(os.path.join(work_path, "task.*"))
     gpaw_runfile = jdata["fp_gpaw_runfile"]
     gpaw_runfile_origin = Path(gpaw_runfile).resolve()
-    assert os.path.exists(
-        gpaw_runfile_origin
-    ), f"Can not find gpaw runfile {gpaw_runfile_origin}"
+    assert os.path.exists(gpaw_runfile_origin), f"Can not find gpaw runfile {gpaw_runfile_origin}"
     for ii in fp_tasks:
         with set_directory(Path(ii)):
             # create file `gpaw_runfile` in the current directory and symlink it to the source file
