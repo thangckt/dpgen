@@ -68,9 +68,7 @@ def expand_sys_str(root_dir: Union[str, Path]) -> list[str]:
             # list of keys in the h5 file
             f_keys = ["/"]
             f.visit(lambda x: f_keys.append("/" + x))
-        matches = [
-            f"{root_dir}#{d}" for d in f_keys if str(Path(d) / "type.raw") in f_keys
-        ]
+        matches = [f"{root_dir}#{d}" for d in f_keys if str(Path(d) / "type.raw") in f_keys]
     else:
         raise OSError(f"{root_dir} does not exist.")
     if len(matches) == 0:
@@ -134,9 +132,7 @@ def convert_training_data_to_hdf5(input_files: list[str], h5_file: str):
                 else:
                     pp = os.path.normpath(str((dd / pp).absolute().relative_to(cwd)))
                     new_pp = os.path.normpath(os.path.relpath(pp, h5_dir))
-                p_sys[ii] = (
-                    os.path.normpath(os.path.relpath(h5_file, dd)) + "#/" + str(new_pp)
-                )
+                p_sys[ii] = os.path.normpath(os.path.relpath(h5_file, dd)) + "#/" + str(new_pp)
                 systems.append(pp)
             f.seek(0)
             json.dump(jinput, f, indent=4)
@@ -244,3 +240,14 @@ def setup_ele_temp(atomic: bool):
 
     dpdata.System.register_data_type(ele_temp_data_type)
     dpdata.LabeledSystem.register_data_type(ele_temp_data_type)
+
+
+def load_json(filename: Union[str, os.PathLike]) -> dict:
+    """Load data from a JSON file."""
+    with open(filename) as f:
+        lines = f.readlines()
+
+    cleaned_lines = [line.strip().split("//", 1)[0] for line in lines if line.strip()]
+    text = "\n".join(cleaned_lines)
+    jdata = json.loads(text)
+    return jdata
