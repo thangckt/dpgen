@@ -1093,6 +1093,8 @@ def make_model_devi(iter_index, jdata, mdata):
             _make_model_devi_native(iter_index, jdata, mdata, conf_systems)
         else:
             raise RuntimeError("unknown model_devi engine", model_devi_engine)
+    elif input_mode == "revise_template":
+        _make_model_devi_revmat(iter_index, jdata, mdata, conf_systems)
 
     # Copy user defined forward_files
     symlink_user_forward_files(mdata=mdata, task_type="model_devi", work_path=work_path)
