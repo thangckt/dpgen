@@ -24,7 +24,6 @@ import shutil
 import sys
 import warnings
 from collections import Counter
-from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional
 
@@ -1086,8 +1085,7 @@ def make_model_devi(iter_index, jdata, mdata):
     input_mode = "native"
     if "template" in cur_job:
         input_mode = "revise_template"
-    use_plm = jdata.get("model_devi_plumed", False)
-    use_plm_path = jdata.get("model_devi_plumed_path", False)
+
     if input_mode == "native":
         if model_devi_engine == "lammps":
             _make_model_devi_native(iter_index, jdata, mdata, conf_systems)
@@ -1095,6 +1093,8 @@ def make_model_devi(iter_index, jdata, mdata):
             raise RuntimeError("unknown model_devi engine", model_devi_engine)
     elif input_mode == "revise_template":
         _make_model_devi_revmat(iter_index, jdata, mdata, conf_systems)
+    else:
+        raise RuntimeError("unknown model_devi input mode", input_mode)
 
     # Copy user defined forward_files
     symlink_user_forward_files(mdata=mdata, task_type="model_devi", work_path=work_path)
@@ -1413,297 +1413,6 @@ def _make_model_devi_native(iter_index, jdata, mdata, conf_systems):
         sys_counter += 1
 
 
-def _make_model_devi_native_gromacs(iter_index, jdata, mdata, conf_systems):
-    try:
-        from gromacs.fileformats.mdp import MDP
-    except ImportError as e:
-        raise RuntimeError("GromacsWrapper>=0.8.0 is needed for DP-GEN + Gromacs.") from e
-    # only support for deepmd v2.0
-    if Version(mdata["deepmd_version"]) < Version("2.0"):
-        raise RuntimeError("Only support deepmd-kit 2.x for model_devi_engine='gromacs'")
-    model_devi_jobs = jdata["model_devi_jobs"]
-    if iter_index >= len(model_devi_jobs):
-        return False
-    cur_job = model_devi_jobs[iter_index]
-    dt = cur_job.get("dt", None)
-    if dt is not None:
-        model_devi_dt = dt
-    else:
-        model_devi_dt = jdata["model_devi_dt"]
-    nsteps = cur_job.get("nsteps", None)
-    lambdas = cur_job.get("lambdas", [1.0])
-    temps = cur_job.get("temps", [298.0])
-
-    for ll in lambdas:
-        assert ll >= 0.0 and ll <= 1.0, "Lambda should be in [0,1]"
-
-    if nsteps is None:
-        raise RuntimeError("nsteps is None, you should set nsteps in model_devi_jobs!")
-    # Currently Gromacs engine is not supported for different temperatures!
-    # If you want to change temperatures, you should change it in mdp files.
-
-    sys_idx = expand_idx(cur_job["sys_idx"])
-    if len(sys_idx) != len(list(set(sys_idx))):
-        raise RuntimeError("system index should be uniq")
-
-    mass_map = jdata["mass_map"]
-
-    iter_name = make_iter_name(iter_index)
-    train_path = os.path.join(iter_name, train_name)
-    train_path = os.path.abspath(train_path)
-    suffix = _get_model_suffix(jdata)
-    models = sorted(glob.glob(os.path.join(train_path, f"graph*{suffix}")))
-    task_model_list = []
-    for ii in models:
-        task_model_list.append(os.path.join("..", os.path.basename(ii)))
-    work_path = os.path.join(iter_name, model_devi_name)
-
-    sys_counter = 0
-    for ss in conf_systems:
-        conf_counter = 0
-        task_counter = 0
-        for cc in ss:
-            for ll in lambdas:
-                for tt in temps:
-                    task_name = make_model_devi_task_name(sys_idx[sys_counter], task_counter)
-                    task_path = os.path.join(work_path, task_name)
-                    create_path(task_path)
-                    gromacs_settings = jdata.get("gromacs_settings", "")
-                    for key, file in gromacs_settings.items():
-                        if (
-                            key != "traj_filename"
-                            and key != "mdp_filename"
-                            and key != "group_name"
-                            and key != "maxwarn"
-                        ):
-                            os.symlink(os.path.join(cc, file), os.path.join(task_path, file))
-                    # input.json for DP-Gromacs
-                    with open(os.path.join(cc, "input.json")) as f:
-                        input_json = json.load(f)
-                    input_json["graph_file"] = models[0]
-                    input_json["lambda"] = ll
-                    with open(os.path.join(task_path, "input.json"), "w") as _outfile:
-                        json.dump(input_json, _outfile, indent=4)
-
-                    # trj_freq
-                    trj_freq = cur_job.get("trj_freq", 10)
-                    mdp = MDP()
-                    mdp.read(os.path.join(cc, gromacs_settings["mdp_filename"]))
-                    mdp["nstcomm"] = trj_freq
-                    mdp["nstxout"] = trj_freq
-                    mdp["nstlog"] = trj_freq
-                    mdp["nstenergy"] = trj_freq
-                    # dt
-                    mdp["dt"] = model_devi_dt
-                    # nsteps
-                    mdp["nsteps"] = nsteps
-                    # temps
-                    if "ref_t" in list(mdp.keys()):
-                        mdp["ref_t"] = tt
-                    else:
-                        mdp["ref-t"] = tt
-                    mdp.write(os.path.join(task_path, gromacs_settings["mdp_filename"]))
-
-                    cwd_ = os.getcwd()
-                    os.chdir(task_path)
-                    job = {}
-                    job["trj_freq"] = cur_job["trj_freq"]
-                    job["model_devi_dt"] = model_devi_dt
-                    job["nsteps"] = nsteps
-                    with open("job.json", "w") as _outfile:
-                        json.dump(job, _outfile, indent=4)
-                    os.chdir(cwd_)
-                    task_counter += 1
-            conf_counter += 1
-        sys_counter += 1
-
-
-def _make_model_devi_amber(iter_index: int, jdata: dict, mdata: dict, conf_systems: list):
-    """Make amber's MD inputs.
-
-    Parameters
-    ----------
-    iter_index : int
-        iter index
-    jdata : dict
-        run parameters. The following parameters will be used in this method:
-            model_devi_jobs : list[dict]
-                The list including the dict for information of each cycle:
-                    sys_idx : list[int]
-                        list of systems to run
-                    trj_freq : int
-                        freq to dump trajectory
-            low_level : str
-                low level method
-            cutoff : float
-                cutoff radius of the DPRc model
-            parm7_prefix : str
-                The path prefix to AMBER PARM7 files
-            parm7 : list[str]
-                List of paths to AMBER PARM7 files. Each file maps to a system.
-            mdin_prefix : str
-                The path prefix to AMBER mdin files
-            mdin : list[str]
-                List of paths to AMBER mdin files. Each files maps to a system.
-                The following keywords will be replaced by the actual value:
-                    @freq@ : freq to dump trajectory
-                    @nstlim@ : total time step to run
-                    @qm_region@ : AMBER mask of the QM region
-                    @qm_theory@ : The QM theory, such as DFTB2
-                    @qm_charge@ : The total charge of the QM theory, such as -2
-                    @rcut@ : cutoff radius of the DPRc model
-                    @GRAPH_FILE0@, @GRAPH_FILE1@, ... : graph files
-            qm_region : list[str]
-                AMBER mask of the QM region. Each mask maps to a system.
-            qm_charge : list[int]
-                Charge of the QM region. Each charge maps to a system.
-            nsteps : list[int]
-                The number of steps to run. Each number maps to a system.
-            r : list[list[float]] or list[list[list[float]]]
-                Constrict values for the enhanced sampling. The first dimension maps to systems.
-                The second dimension maps to confs in each system. The third dimension is the
-                constrict value. It can be a single float for 1D or list of floats for nD.
-            disang_prefix : str
-                The path prefix to disang prefix.
-            disang : list[str]
-                List of paths to AMBER disang files. Each file maps to a sytem.
-                The keyword RVAL will be replaced by the constrict values, or RVAL1, RVAL2, ...
-                for an nD system.
-    mdata : dict
-        machine parameters. Nothing will be used in this method.
-    conf_systems : list
-        conf systems
-
-    References
-    ----------
-    .. [1] Development of Range-Corrected Deep Learning Potentials for Fast, Accurate Quantum
-       Mechanical/Molecular Mechanical Simulations of Chemical Reactions in Solution,
-       Jinzhe Zeng, Timothy J. Giese, Şölen Ekesan, and Darrin M. York, Journal of Chemical
-       Theory and Computation 2021 17 (11), 6993-7009
-
-    inputs: restart (coords), param, mdin, graph, disang (optional)
-
-    """
-    model_devi_jobs = jdata["model_devi_jobs"]
-    if iter_index >= len(model_devi_jobs):
-        return False
-    cur_job = model_devi_jobs[iter_index]
-    sys_idx = expand_idx(cur_job["sys_idx"])
-    if len(sys_idx) != len(list(set(sys_idx))):
-        raise RuntimeError("system index should be uniq")
-
-    iter_name = make_iter_name(iter_index)
-    train_path = os.path.join(iter_name, train_name)
-    train_path = os.path.abspath(train_path)
-    work_path = os.path.join(iter_name, model_devi_name)
-    # parm7 - list
-    parm7 = jdata["parm7"]
-    parm7_prefix = jdata.get("parm7_prefix", "")
-    parm7 = [os.path.join(parm7_prefix, pp) for pp in parm7]
-
-    # link parm file
-    for ii, pp in enumerate(parm7):
-        os.symlink(pp, os.path.join(work_path, "qmmm%d.parm7" % ii))
-    # TODO: consider writing input in json instead of a given file
-    # mdin
-    mdin = jdata["mdin"]
-    mdin_prefix = jdata.get("mdin_prefix", "")
-    mdin = [os.path.join(mdin_prefix, pp) for pp in mdin]
-
-    qm_region = jdata["qm_region"]
-    qm_charge = jdata["qm_charge"]
-    nsteps = jdata["nsteps"]
-
-    for ii, pp in enumerate(mdin):
-        with (
-            open(pp) as f,
-            open(os.path.join(work_path, "init%d.mdin" % ii), "w") as fw,
-        ):
-            mdin_str = f.read()
-            # freq, nstlim, qm_region, qm_theory, qm_charge, rcut, graph
-            mdin_str = (
-                mdin_str.replace("@freq@", str(cur_job.get("trj_freq", 50)))
-                .replace("@nstlim@", str(nsteps[ii]))
-                .replace("@qm_region@", qm_region[ii])
-                .replace("@qm_charge@", str(qm_charge[ii]))
-                .replace("@qm_theory@", jdata["low_level"])
-                .replace("@rcut@", str(jdata["cutoff"]))
-            )
-            suffix = _get_model_suffix(jdata)
-            models = sorted(glob.glob(os.path.join(train_path, f"graph.*{suffix}")))
-            task_model_list = []
-            for ii in models:
-                task_model_list.append(os.path.join("..", os.path.basename(ii)))
-            # graph
-            for jj, mm in enumerate(task_model_list):
-                # replace graph
-                mdin_str = mdin_str.replace("@GRAPH_FILE%d@" % jj, mm)
-            fw.write(mdin_str)
-    # disang - list
-    disang = jdata["disang"]
-    disang_prefix = jdata.get("disang_prefix", "")
-    disang = [os.path.join(disang_prefix, pp) for pp in disang]
-
-    for sys_counter, ss in enumerate(conf_systems):
-        for idx_cc, cc in enumerate(ss):
-            task_counter = idx_cc
-            conf_counter = idx_cc
-
-            task_name = make_model_devi_task_name(sys_idx[sys_counter], task_counter)
-            conf_name = make_model_devi_conf_name(sys_idx[sys_counter], conf_counter)
-            task_path = os.path.join(work_path, task_name)
-            # create task path
-            create_path(task_path)
-            # link restart file
-            loc_conf_name = "init.rst7"
-            if cur_job.get("restart_from_iter") is None:
-                os.symlink(
-                    os.path.join(os.path.join("..", "confs"), conf_name + ".rst7"),
-                    os.path.join(task_path, loc_conf_name),
-                )
-            else:
-                restart_from_iter = cur_job["restart_from_iter"]
-                restart_iter_name = make_iter_name(restart_from_iter)
-                os.symlink(
-                    os.path.relpath(
-                        os.path.join(restart_iter_name, model_devi_name, task_name, "rc.rst7"),
-                        task_path,
-                    ),
-                    os.path.join(task_path, loc_conf_name),
-                )
-            cwd_ = os.getcwd()
-            # chdir to task path
-            os.chdir(task_path)
-
-            # reaction coordinates of umbrella sampling
-            # TODO: maybe consider a better name instead of `r`?
-            if "r" in jdata:
-                r = jdata["r"][sys_idx[sys_counter]][conf_counter]
-                # r can either be a float or a list of float (for 2D coordinates)
-                if not isinstance(r, Iterable) or isinstance(r, str):
-                    r = [r]
-                # disang file should include RVAL, RVAL2, ...
-                with (
-                    open(disang[sys_idx[sys_counter]]) as f,
-                    open("TEMPLATE.disang", "w") as fw,
-                ):
-                    tl = f.read()
-                    for ii, rr in enumerate(r):
-                        if isinstance(rr, Iterable) and not isinstance(rr, str):
-                            raise RuntimeError(
-                                "rr should not be iterable! sys: %d rr: %s r: %s"
-                                % (sys_idx[sys_counter], str(rr), str(r))
-                            )
-                        tl = tl.replace("RVAL" + str(ii + 1), str(rr))
-                    if len(r) == 1:
-                        tl = tl.replace("RVAL", str(r[0]))
-                    fw.write(tl)
-
-            with open("job.json", "w") as fp:
-                json.dump(cur_job, fp, indent=4)
-            os.chdir(cwd_)
-
-
 def run_md_model_devi(iter_index, jdata, mdata):
     # rmdlog.info("This module has been run !")
     model_devi_exec = mdata["model_devi_command"]
@@ -1771,76 +1480,6 @@ def run_md_model_devi(iter_index, jdata, mdata):
             backward_files += ["output.plumed", "COLVAR"]
             if use_plm_path:
                 forward_files += ["plmpath.pdb"]
-    elif model_devi_engine == "gromacs":
-        gromacs_settings = jdata.get("gromacs_settings", {})
-        mdp_filename = gromacs_settings.get("mdp_filename", "md.mdp")
-        topol_filename = gromacs_settings.get("topol_filename", "processed.top")
-        conf_filename = gromacs_settings.get("conf_filename", "conf.gro")
-        index_filename = gromacs_settings.get("index_filename", "index.raw")
-        type_filename = gromacs_settings.get("type_filename", "type.raw")
-        ndx_filename = gromacs_settings.get("ndx_filename", "")
-        # Initial reference to process pbc condition.
-        # Default is em.tpr
-        ref_filename = gromacs_settings.get("ref_filename", "em.tpr")
-        deffnm = gromacs_settings.get("deffnm", "deepmd")
-        maxwarn = gromacs_settings.get("maxwarn", 1)
-        traj_filename = gromacs_settings.get("traj_filename", "deepmd_traj.gro")
-        grp_name = gromacs_settings.get("group_name", "Other")
-        trj_freq = cur_job.get("trj_freq", 10)
-
-        command = "%s grompp -f %s -p %s -c %s -o %s -maxwarn %d" % (
-            model_devi_exec,
-            mdp_filename,
-            topol_filename,
-            conf_filename,
-            deffnm,
-            maxwarn,
-        )
-        command += f"&& {model_devi_exec} mdrun -deffnm {deffnm} -cpi"
-        if ndx_filename:
-            command += f'&& echo -e "{grp_name}\\n{grp_name}\\n" | {model_devi_exec} trjconv -s {ref_filename} -f {deffnm}.trr -n {ndx_filename} -o {traj_filename} -pbc mol -ur compact -center'
-        else:
-            command += f'&& echo -e "{grp_name}\\n{grp_name}\\n" | {model_devi_exec} trjconv -s {ref_filename} -f {deffnm}.trr -o {traj_filename} -pbc mol -ur compact -center'
-        command += "&& if [ ! -d traj ]; then \n mkdir traj; fi\n"
-        command += f"python -c \"import dpdata;system = dpdata.System('{traj_filename}', fmt='gromacs/gro'); [system.to_gromacs_gro('traj/%d.gromacstrj' % (i * {trj_freq}), frame_idx=i) for i in range(system.get_nframes())]; system.to_deepmd_npy('traj_deepmd')\""
-        _rel_model_names = " ".join([str(os.path.join("..", ii)) for ii in model_names])
-        command += (
-            f"&& dp model-devi -m {_rel_model_names} -s traj_deepmd -o model_devi.out -f {trj_freq}"
-        )
-        del _rel_model_names
-        commands = [command]
-
-        forward_files = [
-            mdp_filename,
-            topol_filename,
-            conf_filename,
-            index_filename,
-            ref_filename,
-            type_filename,
-            "input.json",
-            "job.json",
-        ]
-        if ndx_filename:
-            forward_files.append(ndx_filename)
-        backward_files = [
-            f"{deffnm}.tpr",
-            f"{deffnm}.log",
-            traj_filename,
-            "model_devi.out",
-            "traj",
-            "traj_deepmd",
-        ]
-    elif model_devi_engine == "amber":
-        commands = [
-            ("TASK=$(basename $(pwd)) && " "SYS1=${TASK:5:3} && " "SYS=$((10#$SYS1)) && ")
-            + model_devi_exec
-            + (
-                " -O -p ../qmmm$SYS.parm7 -c init.rst7 -i ../init$SYS.mdin -o rc.mdout -r rc.rst7 -x rc.nc -inf rc.mdinfo -ref init.rst7"
-            )
-        ]
-        forward_files = ["init.rst7", "TEMPLATE.disang"]
-        backward_files = ["rc.mdout", "rc.nc", "rc.rst7", "TEMPLATE.dumpave"]
-        model_names.extend(["qmmm*.parm7", "init*.mdin"])
 
     user_forward_files = mdata.get("model_devi" + "_user_forward_files", [])
     forward_files += [os.path.basename(file) for file in user_forward_files]
@@ -2079,16 +1718,10 @@ def _select_by_model_devi_standard(
                             fp_rest_accurate.append([tt, cc])
                         counter["accurate"] += 1
                     else:
-                        if model_devi_engine == "calypso":
-                            dlog.info(
-                                "ase opt traj %s frame %d with f devi %f does not belong to either accurate, candidiate and failed "
-                                % (tt, ii, all_conf[ii][4])
-                            )
-                        else:
-                            raise RuntimeError(
-                                "md traj %s frame %d with f devi %f does not belong to either accurate, candidiate and failed, it should not happen"
-                                % (tt, ii, all_conf[ii][4])
-                            )
+                        raise RuntimeError(
+                            "md traj %s frame %d with f devi %f does not belong to either accurate, candidiate and failed, it should not happen"
+                            % (tt, ii, all_conf[ii][4])
+                        )
                 else:
                     idx_candidate = np.where(
                         np.logical_and(
@@ -2857,29 +2490,6 @@ def run_fp_inner(
         return
 
     fp_style = jdata["fp_style"]
-    if fp_style == "amber/diff":
-        # firstly get sys_idx
-        fp_command = (
-            (
-                "TASK=$(basename $(pwd)) && "
-                "SYS1=${TASK:5:3} && "
-                "SYS=$((10#$SYS1)) && "
-                'QM_REGION=$(awk "NR==$SYS+1" ../qm_region) &&'
-            )
-            + fp_command
-            + (
-                " -O -p ../qmmm$SYS.parm7 -c ../init$SYS.rst7 -i ../low_level$SYS.mdin -o low_level.mdout -r low_level.rst7 "
-                "-x low_level.nc -y rc.nc -frc low_level.mdfrc -inf low_level.mdinfo && "
-            )
-            + fp_command
-            + (
-                " -O -p ../qmmm$SYS.parm7 -c ../init$SYS.rst7 -i ../high_level$SYS.mdin -o high_level.mdout -r high_level.rst7 "
-                "-x high_level.nc -y rc.nc -frc high_level.mdfrc -inf high_level.mdinfo && "
-            )
-            + (
-                'dpamber corr --cutoff {:f} --parm7_file ../qmmm$SYS.parm7 --nc rc.nc --hl high_level --ll low_level --qm_region "$QM_REGION"'
-            ).format(jdata["cutoff"])
-        )
     if fp_style == "gpaw":
         fp_command = f"{fp_command} {jdata.get('fp_gpaw_runfile')} {jdata.get('fp_gpaw_cli_args')}"
 
