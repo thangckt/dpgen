@@ -53,6 +53,19 @@ def init_bulk_gpaw_args() -> list[Argument]:
     return args
 
 
+def init_surf_gpaw_args() -> list[Argument]:
+    args = [
+        Argument(
+            "gpaw_optimize",
+            str,
+            optional=True,
+            default=str(GPAW_LIB_PATH / "cli_gpaw_optimize.py"),
+            doc="Input file to run optimization (similar to md_relax in VASP).",
+        ),
+    ]
+    return args
+
+
 ##### ANCHOR: Stage 1 - Geometry Optimization/ relaxation
 def make_gpaw_relax(jdata, mdata):
     out_dir = jdata["out_dir"]

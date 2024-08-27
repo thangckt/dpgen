@@ -204,6 +204,8 @@ def load_file(filename: Union[str, os.PathLike]) -> dict:
     if filename.endswith(".json"):
         with open(filename) as fp:
             data = json.load(fp)
+    elif filename.endswith(".jsonc"):
+        data = load_json(filename)
     elif filename.endswith(".yaml") or filename.endswith(".yml"):
         from ruamel.yaml import YAML
 
@@ -213,6 +215,17 @@ def load_file(filename: Union[str, os.PathLike]) -> dict:
     else:
         raise ValueError(f"Unsupported file format: {filename}")
     return data
+
+
+def load_json(filename: Union[str, os.PathLike]) -> dict:
+    """Load data from a JSON file that allow comments."""
+    with open(filename) as f:
+        lines = f.readlines()
+
+    cleaned_lines = [line.strip().split("//", 1)[0] for line in lines if line.strip()]
+    text = "\n".join(cleaned_lines)
+    jdata = json.loads(text)
+    return jdata
 
 
 def setup_ele_temp(atomic: bool):
@@ -240,14 +253,3 @@ def setup_ele_temp(atomic: bool):
 
     dpdata.System.register_data_type(ele_temp_data_type)
     dpdata.LabeledSystem.register_data_type(ele_temp_data_type)
-
-
-def load_json(filename: Union[str, os.PathLike]) -> dict:
-    """Load data from a JSON file."""
-    with open(filename) as f:
-        lines = f.readlines()
-
-    cleaned_lines = [line.strip().split("//", 1)[0] for line in lines if line.strip()]
-    text = "\n".join(cleaned_lines)
-    jdata = json.loads(text)
-    return jdata

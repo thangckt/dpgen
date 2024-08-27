@@ -1,7 +1,7 @@
 from dargs import Argument, Variant
 
 from dpgen.arginfo import general_mdata_arginfo
-from dpgen.data.tools.gpaw_init import init_bulk_gpaw_args
+from dpgen.data.tools.gpaw_init import init_bulk_gpaw_args, init_surf_gpaw_args
 
 
 def init_bulk_mdata_arginfo() -> Argument:
@@ -134,6 +134,27 @@ def init_bulk_jdata_arginfo() -> Argument:
     )
 
 
+def init_surf_variant_type_args() -> list[Variant]:
+    doc_init_fp_style = "First-principle software. If this key is absent."
+    return [
+        Variant(
+            "init_fp_style",
+            [
+                Argument(
+                    "VASP",
+                    dict,
+                    [],
+                    doc="No more parameters is needed to be added.",
+                ),
+                Argument("GPAW", dict, init_surf_gpaw_args(), doc="GPAW"),
+            ],
+            default_tag="VASP",
+            optional=True,
+            doc=doc_init_fp_style,
+        )
+    ]
+
+
 def init_surf_jdata_arginfo() -> Argument:
     """Generate arginfo for dpgen init_surf jdata.
 
@@ -202,6 +223,7 @@ def init_surf_jdata_arginfo() -> Argument:
             Argument("pert_atom", float, optional=False, doc=doc_pert_atom),
             Argument("coll_ndata", int, optional=False, doc=doc_coll_ndata),
         ],
+        sub_variants=init_surf_variant_type_args(),
         doc=doc_init_surf,
     )
 
