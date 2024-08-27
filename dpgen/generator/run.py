@@ -38,6 +38,7 @@ from dpgen import ROOT_PATH, SHORT_CMD, dlog
 from dpgen.auto_test.lib.vasp import make_kspacing_kpoints
 from dpgen.dispatcher.Dispatcher import make_submission
 from dpgen.generator.lib.ele_temp import NBandsEsti
+from dpgen.generator.lib.gaussian import take_cluster
 from dpgen.generator.lib.lammps import (
     get_all_dumped_forces,
     get_dumped_forces,
@@ -79,12 +80,7 @@ model_devi_conf_fmt = data_system_fmt + ".%04d"
 fp_name = "02.fp"
 fp_task_fmt = data_system_fmt + ".%06d"
 cvasp_file = os.path.join(ROOT_PATH, "generator/lib/cvasp.py")
-# for calypso
-calypso_run_opt_name = "gen_stru_analy"
-calypso_model_devi_name = "model_devi_results"
-calypso_run_model_devi_file = os.path.join(ROOT_PATH, "generator/lib/calypso_run_model_devi.py")
-check_outcar_file = os.path.join(ROOT_PATH, "generator/lib/calypso_check_outcar.py")
-run_opt_file = os.path.join(ROOT_PATH, "generator/lib/calypso_run_opt.py")
+
 
 from dpgen.generator.lib_gpaw.gpaw import make_fp_gpaw, post_fp_gpaw
 
@@ -297,14 +293,6 @@ def make_train_dp(iter_index, jdata, mdata):
         log_task("prev data is empty, copy prev model")
         copy_model(numb_models, iter_index - 1, iter_index, suffix)
         return
-    elif (
-        model_devi_engine != "calypso"
-        and iter_index > 0
-        and _check_skip_train(model_devi_jobs[iter_index - 1])
-    ):
-        log_task("skip training at step %d " % (iter_index - 1))
-        copy_model(numb_models, iter_index - 1, iter_index, suffix)
-        return
     else:
         iter_name = make_iter_name(iter_index)
         work_path = os.path.join(iter_name, train_name)
@@ -370,12 +358,7 @@ def make_train_dp(iter_index, jdata, mdata):
                 old_range = len(init_data_sys)
             fp_path = os.path.join(make_iter_name(ii), fp_name)
             fp_data_sys = glob.glob(os.path.join(fp_path, "data.*"))
-            if model_devi_engine == "calypso":
-                _modd_path = os.path.join(
-                    make_iter_name(ii), model_devi_name, calypso_model_devi_name
-                )
-                sys_list = glob.glob(os.path.join(_modd_path, "*.structures"))
-                sys_batch_size = ["auto" for aa in range(len(sys_list))]
+
             for jj in fp_data_sys:
                 sys_idx = int(jj.split(".")[-1])
                 sys_paths = expand_sys_str(jj)
@@ -1029,29 +1012,8 @@ def make_model_devi(iter_index, jdata, mdata):
     model_devi_engine = jdata.get("model_devi_engine", "lammps")  # Default is lammps
     model_devi_jobs = jdata["model_devi_jobs"]
 
-    if model_devi_engine != "calypso":
-        if iter_index >= len(model_devi_jobs):
-            return False
-    else:
-        # mode 1: generate structures according to the user-provided input.dat file, so calypso_input_path and model_devi_max_iter are needed
-        run_mode = 1
-        if "calypso_input_path" in jdata:
-            try:
-                maxiter = jdata.get("model_devi_max_iter")
-            except KeyError:
-                raise KeyError(
-                    "calypso_input_path key exists so you should provide model_devi_max_iter key to control the max iter number"
-                )
-        # mode 2: control each iteration to generate structures in specific way by providing model_devi_jobs key
-        else:
-            try:
-                maxiter = max(model_devi_jobs[-1].get("times"))
-                run_mode = 2
-            except KeyError:
-                raise KeyError('did not find model_devi_jobs["times"] key')
-        if iter_index > maxiter:
-            dlog.info(f"iter_index is {iter_index} and maxiter is {maxiter}")
-            return False
+    if iter_index >= len(model_devi_jobs):
+        return False
 
     if "sys_configs_prefix" in jdata:
         sys_configs = []
@@ -1063,12 +1025,8 @@ def make_model_devi(iter_index, jdata, mdata):
         sys_configs = jdata["sys_configs"]
     shuffle_poscar = jdata.get("shuffle_poscar", False)
 
-    if model_devi_engine != "calypso":
-        cur_job = model_devi_jobs[iter_index]
-        sys_idx = expand_idx(cur_job["sys_idx"])
-    else:
-        cur_job = {"model_devi_engine": "calypso", "input.dat": "user_provided"}
-        sys_idx = []
+    cur_job = model_devi_jobs[iter_index]
+    sys_idx = expand_idx(cur_job["sys_idx"])
 
     if len(sys_idx) != len(list(set(sys_idx))):
         raise RuntimeError("system index should be uniq")
@@ -1095,67 +1053,10 @@ def make_model_devi(iter_index, jdata, mdata):
     models = sorted(glob.glob(os.path.join(train_path, f"graph*{suffix}")))
     work_path = os.path.join(iter_name, model_devi_name)
     create_path(work_path)
-    if model_devi_engine == "calypso":
-        _calypso_run_opt_path = os.path.join(work_path, calypso_run_opt_name)
-        calypso_model_devi_path = os.path.join(work_path, calypso_model_devi_name)
-        create_path(calypso_model_devi_path)
-        # run model devi script
-        calypso_run_model_devi_script = os.path.join(
-            calypso_model_devi_path, "calypso_run_model_devi.py"
-        )
-        shutil.copyfile(calypso_run_model_devi_file, calypso_run_model_devi_script)
-        # Create work path list
-        calypso_run_opt_path = []
-
-        # mode 1: generate structures according to the user-provided input.dat file,
-        # so calypso_input_path and model_devi_max_iter are needed
-        if run_mode == 1:
-            if jdata.get("vsc", False) and len(jdata.get("type_map")) > 1:
-                # [input.dat.Li.250, input.dat.Li.300]
-                one_ele_inputdat_list = glob.glob(
-                    f"{jdata.get('calypso_input_path')}/input.dat.{jdata.get('type_map')[0]}.*"
-                )
-                if len(one_ele_inputdat_list) == 0:
-                    number_of_pressure = 1
-                else:
-                    number_of_pressure = len(list(set(one_ele_inputdat_list)))
-
-                # calypso_run_opt_path = ['gen_struc_analy.000','gen_struc_analy.001']
-                for temp_idx in range(number_of_pressure):
-                    calypso_run_opt_path.append("%s.%03d" % (_calypso_run_opt_path, temp_idx))
-            elif not jdata.get("vsc", False):
-                calypso_run_opt_path.append("%s.%03d" % (_calypso_run_opt_path, 0))
-
-        # mode 2: control each iteration to generate structures in specific way
-        # by providing model_devi_jobs key
-        elif run_mode == 2:
-            for iiidx, jobbs in enumerate(model_devi_jobs):
-                if iter_index in jobbs.get("times"):
-                    cur_job = model_devi_jobs[iiidx]
-
-            pressures_list = cur_job.get("PSTRESS", [0.0001])
-            for temp_idx in range(len(pressures_list)):
-                calypso_run_opt_path.append("%s.%03d" % (_calypso_run_opt_path, temp_idx))
-        # to different directory
-        # calypso_run_opt_path = ['gen_struc_analy.000','gen_struc_analy.001','gen_struc_analy.002',]
-        for temp_calypso_run_opt_path in calypso_run_opt_path:
-            create_path(temp_calypso_run_opt_path)
-            # run confs opt script
-            run_opt_script = os.path.join(temp_calypso_run_opt_path, "calypso_run_opt.py")
-            shutil.copyfile(run_opt_file, run_opt_script)
-            # check outcar script
-            check_outcar_script = os.path.join(temp_calypso_run_opt_path, "check_outcar.py")
-            shutil.copyfile(check_outcar_file, check_outcar_script)
 
     for mm in models:
         model_name = os.path.basename(mm)
-        if model_devi_engine != "calypso":
-            os.symlink(mm, os.path.join(work_path, model_name))
-        else:
-            for temp_calypso_run_opt_path in calypso_run_opt_path:
-                models_path = os.path.join(temp_calypso_run_opt_path, model_name)
-                if not os.path.exists(models_path):
-                    os.symlink(mm, models_path)
+        os.symlink(mm, os.path.join(work_path, model_name))
 
     with open(os.path.join(work_path, "cur_job.json"), "w") as outfile:
         json.dump(cur_job, outfile, indent=4)
@@ -1186,14 +1087,7 @@ def make_model_devi(iter_index, jdata, mdata):
                 if jdata.get("model_devi_nopbc", False):
                     system.remove_pbc()
                 system.to_lammps_lmp(os.path.join(conf_path, lmp_name))
-            elif model_devi_engine == "gromacs":
-                pass
-            elif model_devi_engine == "amber":
-                # Jinzhe's specific Amber version
-                conf_name = make_model_devi_conf_name(sys_idx[sys_counter], conf_counter)
-                rst7_name = conf_name + ".rst7"
-                # link restart file
-                os.symlink(cc, os.path.join(conf_path, rst7_name))
+
             conf_counter += 1
         sys_counter += 1
 
@@ -2675,21 +2569,6 @@ def make_fp_vasp_incar(iter_index, jdata, nbands_esti=None):
         os.chdir(cwd)
 
 
-def _make_fp_pwmat_input(iter_index, jdata):
-    iter_name = make_iter_name(iter_index)
-    work_path = os.path.join(iter_name, fp_name)
-    fp_tasks = glob.glob(os.path.join(work_path, "task.*"))
-    fp_tasks.sort()
-    if len(fp_tasks) == 0:
-        return
-    cwd = os.getcwd()
-    for ii in fp_tasks:
-        os.chdir(ii)
-        make_pwmat_input(jdata, "etot.input")
-        os.system("sed -i '1,2c 4 1' etot.input")
-        os.chdir(cwd)
-
-
 def make_fp_vasp_cp_cvasp(iter_index, jdata):
     # Move cvasp interface to jdata
     if ("cvasp" in jdata) and (jdata["cvasp"] is True):
@@ -2824,68 +2703,6 @@ def sys_link_fp_vasp_pp(iter_index, jdata):
             os.chdir(jj)
             os.symlink(os.path.join("..", f"POTCAR.{ii}"), "POTCAR")
             os.chdir(cwd)
-
-
-def _link_fp_abacus_pporb_descript(iter_index, jdata):
-    # assume pp orbital files, numerical descrptors and model for dpks are all in fp_pp_path.
-    fp_pp_path = os.path.abspath(jdata["fp_pp_path"])
-    type_map = jdata["type_map"]
-
-    iter_name = make_iter_name(iter_index)
-    work_path = os.path.join(iter_name, fp_name)
-    fp_tasks = glob.glob(os.path.join(work_path, "task.*"))
-    fp_tasks.sort()
-    if len(fp_tasks) == 0:
-        return
-
-    cwd = os.getcwd()
-    for ii in fp_tasks:
-        os.chdir(ii)
-
-        # get value of 'deepks_model' from INPUT
-        input_param = get_abacus_input_parameters("INPUT")
-        fp_dpks_model = input_param.get("deepks_model", None)
-        if fp_dpks_model is not None:
-            model_file = os.path.join(
-                fp_pp_path, os.path.split(fp_dpks_model)[1]
-            )  # only the filename
-            assert os.path.isfile(
-                model_file
-            ), f"Can not find the deepks model file {model_file}, which is defined in {ii}/INPUT"
-            os.symlink(model_file, fp_dpks_model)  # link to the model file
-
-        # get pp, orb, descriptor filenames from STRU
-        stru_param = get_abacus_STRU("STRU")
-        atom_names = stru_param["atom_names"]
-        pp_files_stru = stru_param.get("pp_files", None)
-        orb_files_stru = stru_param.get("orb_files", None)
-        descriptor_file_stru = stru_param.get("dpks_descriptor", None)
-
-        if pp_files_stru:
-            assert "fp_pp_files" in jdata, "need to define fp_pp_files in jdata"
-        if orb_files_stru:
-            assert "fp_orb_files" in jdata, "need to define fp_orb_files in jdata"
-        if descriptor_file_stru:
-            assert "fp_dpks_descriptor" in jdata, "need to define fp_dpks_descriptor in jdata"
-
-        for idx, iatom in enumerate(atom_names):
-            type_map_idx = type_map.index(iatom)
-            if iatom not in type_map:
-                raise RuntimeError(f"atom name {iatom} in STRU is not defined in type_map")
-            if pp_files_stru:
-                src_file = os.path.join(fp_pp_path, jdata["fp_pp_files"][type_map_idx])
-                assert os.path.isfile(src_file), f"Can not find the pseudopotential file {src_file}"
-                os.symlink(src_file, pp_files_stru[idx])
-            if orb_files_stru:
-                src_file = os.path.join(fp_pp_path, jdata["fp_orb_files"][type_map_idx])
-                assert os.path.isfile(src_file), f"Can not find the orbital file {src_file}"
-                os.symlink(src_file, orb_files_stru[idx])
-        if descriptor_file_stru:
-            src_file = os.path.join(fp_pp_path, jdata["fp_dpks_descriptor"])
-            assert os.path.isfile(src_file), f"Can not find the descriptor file {src_file}"
-            os.symlink(src_file, descriptor_file_stru)
-
-        os.chdir(cwd)
 
 
 def _make_fp_vasp_configs(iter_index: int, jdata: dict):
