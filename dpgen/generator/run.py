@@ -957,7 +957,7 @@ def find_only_one_key(lmp_lines, key):
         if len(words) >= nkey and words[:nkey] == key:
             found.append(idx)
     if len(found) > 1:
-        raise RuntimeError("found %d keywords %s" % (len(found), key))
+        raise RuntimeError(f"found {len(found)} keywords {key}")
     if len(found) == 0:
         raise RuntimeError(f"failed to find keyword {key}")
     return found[0]
@@ -967,14 +967,10 @@ def revise_lmp_input_model(lmp_lines, task_model_list, trj_freq, deepmd_version=
     idx = find_only_one_key(lmp_lines, ["pair_style", "deepmd"])
     graph_list = " ".join(task_model_list)
     if Version(deepmd_version) < Version("1"):
-        lmp_lines[idx] = "pair_style      deepmd %s %d model_devi.out\n" % (
-            graph_list,
-            trj_freq,
-        )
+        lmp_lines[idx] = f"pair_style   deepmd {graph_list} {trj_freq:.0f} model_devi.out\n"
     else:
-        lmp_lines[idx] = "pair_style      deepmd %s out_freq %d out_file model_devi.out\n" % (
-            graph_list,
-            trj_freq,
+        lmp_lines[idx] = (
+            f"pair_style    deepmd {graph_list} out_freq {trj_freq:.0f} out_file model_devi.out\n"
         )
     return lmp_lines
 
@@ -982,20 +978,17 @@ def revise_lmp_input_model(lmp_lines, task_model_list, trj_freq, deepmd_version=
 def revise_lmp_input_dump(lmp_lines, trj_freq, model_devi_merge_traj=False):
     idx = find_only_one_key(lmp_lines, ["dump", "dpgen_dump"])
     if model_devi_merge_traj:
-        lmp_lines[idx] = (
-            "dump            dpgen_dump all custom %d    all.lammpstrj id type x y z\n" % trj_freq
-        )
+        lmp_lines[idx] = f"dump  dpgen_dump all custom {trj_freq:.0f} all.lammpstrj id type x y z\n"
     else:
         lmp_lines[idx] = (
-            "dump            dpgen_dump all custom %d traj/*.lammpstrj id type x y z\n" % trj_freq
+            f"dump  dpgen_dump all custom {trj_freq:.0f} traj/*.lammpstrj id type x y z\n"
         )
-
     return lmp_lines
 
 
 def revise_lmp_input_plm(lmp_lines, in_plm, out_plm="output.plumed"):
     idx = find_only_one_key(lmp_lines, ["fix", "dpgen_plm"])
-    lmp_lines[idx] = f"fix            dpgen_plm all plumed plumedfile {in_plm} outfile {out_plm}\n"
+    lmp_lines[idx] = f"fix      dpgen_plm all plumed plumedfile {in_plm} outfile {out_plm}\n"
     return lmp_lines
 
 
@@ -1091,8 +1084,6 @@ def make_model_devi(iter_index, jdata, mdata):
         sys_counter += 1
 
     input_mode = "native"
-    if "calypso_input_path" in jdata:
-        input_mode = "buffet"
     if "template" in cur_job:
         input_mode = "revise_template"
     use_plm = jdata.get("model_devi_plumed", False)
@@ -1100,10 +1091,6 @@ def make_model_devi(iter_index, jdata, mdata):
     if input_mode == "native":
         if model_devi_engine == "lammps":
             _make_model_devi_native(iter_index, jdata, mdata, conf_systems)
-        elif model_devi_engine == "gromacs":
-            _make_model_devi_native_gromacs(iter_index, jdata, mdata, conf_systems)
-        elif model_devi_engine == "amber":
-            _make_model_devi_amber(iter_index, jdata, mdata, conf_systems)
         else:
             raise RuntimeError("unknown model_devi engine", model_devi_engine)
 
