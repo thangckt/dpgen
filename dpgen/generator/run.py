@@ -272,8 +272,7 @@ def make_train_dp(iter_index, jdata, mdata):
     # train_param = jdata['train_param']
     train_input_file = default_train_input_file
     numb_models = jdata["numb_models"]
-    init_data_prefix = jdata["init_data_prefix"]
-    init_data_prefix = os.path.abspath(init_data_prefix)
+    init_data_prefix = os.path.abspath(jdata["init_data_prefix"])
     init_data_sys_ = jdata["init_data_sys"]
     fp_task_min = jdata["fp_task_min"]
     model_devi_jobs = jdata["model_devi_jobs"]
@@ -384,14 +383,9 @@ def make_train_dp(iter_index, jdata, mdata):
         sys_paths = expand_sys_str(os.path.join(init_data_prefix, ii))
         for single_sys in sys_paths:
             init_data_sys.append(
-                os.path.normpath(
-                    os.path.join(
-                        "..",
-                        "data.init",
-                        ii,
-                        os.path.relpath(single_sys, os.path.join(init_data_prefix, ii)),
-                    )
-                )
+                Path(
+                    f"../data.init/{ii}/{os.path.relpath(single_sys, os.path.join(init_data_prefix, ii))}"
+                ).as_posix()
             )
             init_batch_size.append(detect_batch_size(ss, single_sys))
             if auto_ratio:
