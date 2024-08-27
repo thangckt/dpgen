@@ -340,8 +340,7 @@ def make_train_dp(iter_index, jdata, mdata):
                 Path(
                     os.path.normpath(
                         os.path.join(
-                            "..",
-                            "data.init",
+                            "../data.init",
                             ii,
                             os.path.relpath(single_sys, os.path.join(init_data_prefix, ii)),
                         )
@@ -375,7 +374,7 @@ def make_train_dp(iter_index, jdata, mdata):
                     continue
                 for sys_single in sys_paths:
                     init_data_sys.append(
-                        os.path.normpath(os.path.join("..", "data.iters", sys_single))
+                        Path(os.path.normpath(os.path.join("../data.iters", sys_single))).as_posix()
                     )
                     batch_size = (
                         sys_batch_size[sys_idx] if sys_idx < len(sys_batch_size) else "auto"
