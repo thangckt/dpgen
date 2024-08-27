@@ -768,8 +768,6 @@ def run_train_dp(iter_index, jdata, mdata):
     if suffix == ".pth":
         train_command += " --pt"
 
-    train_resources = mdata["train_resources"]
-
     # paths
     iter_name = make_iter_name(iter_index)
     work_path = os.path.join(iter_name, train_name)
@@ -1563,7 +1561,7 @@ def _make_model_devi_native(iter_index, jdata, mdata, conf_systems):
     models = sorted(glob.glob(os.path.join(train_path, f"graph*{suffix}")))
     task_model_list = []
     for ii in models:
-        task_model_list.append(os.path.join("..", os.path.basename(ii)))
+        task_model_list.append(Path(f"../{Path(ii).name}").as_posix())
     work_path = os.path.join(iter_name, model_devi_name)
 
     sys_counter = 0
