@@ -2103,8 +2103,6 @@ def run_md_model_devi(iter_index, jdata, mdata):
         backward_files = ["rc.mdout", "rc.nc", "rc.rst7", "TEMPLATE.dumpave"]
         model_names.extend(["qmmm*.parm7", "init*.mdin"])
 
-    cwd = os.getcwd()
-
     user_forward_files = mdata.get("model_devi" + "_user_forward_files", [])
     forward_files += [os.path.basename(file) for file in user_forward_files]
     backward_files += mdata.get("model_devi" + "_user_backward_files", [])
