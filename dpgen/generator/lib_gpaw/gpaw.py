@@ -12,8 +12,10 @@ import numpy as np
 from dargs import Argument
 
 from dpgen.generator.lib.utils import make_iter_name
-from dpgen.generator.run import fp_name  # fp_name = "02.fp"
 from dpgen.util import set_directory
+
+# from dpgen.generator.run import fp_name  # fp_name = "02.fp"
+fp_name = "02.fp"
 
 GPAW_LIB_PATH = Path(__file__).parent
 
