@@ -18,7 +18,7 @@ import dpgen.data.tools.diamond as diamond
 import dpgen.data.tools.fcc as fcc
 import dpgen.data.tools.hcp as hcp
 import dpgen.data.tools.sc as sc
-from dpgen import ROOT_PATH, dlog
+from dpgen import dlog
 from dpgen.dispatcher.Dispatcher import make_submission_compat
 from dpgen.generator.lib.utils import symlink_user_forward_files
 from dpgen.remote.decide_machine import convert_mdata
@@ -182,7 +182,9 @@ def poscar_elong(poscar_in, poscar_out, elong, shift_center=True):
         z_mean = cart_coords[:, 2].mean()
         z_shift = st.lattice.c / 2 - z_mean
         cart_coords[:, 2] = cart_coords[:, 2] + z_shift
-        nst = Structure(st.lattice, st.species, coords=cart_coords, coords_are_cartesian=True)
+        nst = Structure(
+            st.lattice, st.species, coords=cart_coords, coords_are_cartesian=True
+        )
         nst.to(poscar_out, "poscar")
     else:
         with open(poscar_out, "w") as fout:
@@ -263,11 +265,15 @@ def make_super_cell_pymatgen(jdata):
         os.chdir(path_cur_surf)
         # slabgen = SlabGenerator(ss, miller, z_min, 1e-3)
         if user_layer_numb:
-            slab = general_surface.surface(ss, indices=miller, vacuum=vacuum_min, layers=user_layer_numb)
+            slab = general_surface.surface(
+                ss, indices=miller, vacuum=vacuum_min, layers=user_layer_numb
+            )
         else:
             # build slab according to z_min value
             for layer_numb in range(1, max_layer_numb + 1):
-                slab = general_surface.surface(ss, indices=miller, vacuum=vacuum_min, layers=layer_numb)
+                slab = general_surface.surface(
+                    ss, indices=miller, vacuum=vacuum_min, layers=layer_numb
+                )
                 if slab.cell.lengths()[-1] >= z_min:
                     break
                 if layer_numb == max_layer_numb:
@@ -440,7 +446,9 @@ def make_scale(jdata):
             else:
                 pos_src = os.path.join(os.path.join(init_path, ii), "CONTCAR")
             if not os.path.isfile(pos_src):
-                raise RuntimeError(f"file {pos_src} not found, vasp relaxation should be run before scale poscar")
+                raise RuntimeError(
+                    f"file {pos_src} not found, vasp relaxation should be run before scale poscar"
+                )
             scale_path = os.path.join(work_path, ii)
             scale_path = os.path.join(scale_path, f"scale-{jj:.3f}")
             create_path(scale_path)
@@ -462,7 +470,9 @@ def pert_scaled(jdata):
             elongs = np.arange(vacuum_resol[0], vacuum_max, vacuum_resol[0])
         elif len(vacuum_resol) == 2:
             mid_point = jdata.get("mid_point")
-            head_elongs = np.arange(vacuum_resol[0], mid_point, vacuum_resol[0]).tolist()
+            head_elongs = np.arange(
+                vacuum_resol[0], mid_point, vacuum_resol[0]
+            ).tolist()
             tail_elongs = np.arange(mid_point, vacuum_max, vacuum_resol[1]).tolist()
             elongs = np.unique(head_elongs + tail_elongs).tolist()
         else:
@@ -492,20 +502,24 @@ def pert_scaled(jdata):
     os.chdir(cwd)
 
     ### Construct the perturbation command
-    python_exec = os.path.join(os.path.dirname(__file__), "tools", "create_random_disturb.py")
+    python_exec = os.path.join(
+        os.path.dirname(__file__), "tools", "create_random_disturb.py"
+    )
     pert_cmd = f"{sys.executable} {python_exec} -etmax {pert_box} -ofmt vasp POSCAR {pert_numb} {pert_atom} > /dev/null"
 
     ### Loop over each system and scale
     for ii in sys_pe:
         for jj in scale:
-            path_work = os.path.join(path_sp, ii, f"scale-{jj:.3f}")
-            assert os.path.isdir(path_work)
-            os.chdir(path_work)
-
-            poscar_in = os.path.join(path_work, "POSCAR")
+            path_scale = os.path.join(path_sp, ii, f"scale-{jj:.3f}")
+            assert os.path.isdir(path_scale)
+            os.chdir(path_scale)
+            dlog.info(os.getcwd())
+            poscar_in = os.path.join(path_scale, "POSCAR")
             assert os.path.isfile(poscar_in)
+
+            ### Loop over each perturbation
             for ll in elongs:
-                path_elong = os.path.join(path_work, f"elong-{ll:3.3f}")
+                path_elong = os.path.join(path_scale, f"elong-{ll:3.3f}")
                 create_path(path_elong)
                 os.chdir(path_elong)
                 poscar_elong(poscar_in, "POSCAR", ll)
@@ -555,7 +569,9 @@ def run_vasp_relax(jdata, mdata):
     work_path_list = glob.glob(os.path.join(work_dir, "surf-*"))
     task_format = {"fp": "sys-*"}
     for work_path in work_path_list:
-        symlink_user_forward_files(mdata=mdata, task_type="fp", work_path=work_path, task_format=task_format)
+        symlink_user_forward_files(
+            mdata=mdata, task_type="fp", work_path=work_path, task_format=task_format
+        )
     user_forward_files = mdata.get("fp" + "_user_forward_files", [])
     forward_files += [os.path.basename(file) for file in user_forward_files]
     backward_files += mdata.get("fp" + "_user_backward_files", [])
@@ -591,11 +607,7 @@ def run_vasp_relax(jdata, mdata):
 
 
 from dpgen.data.tools.gpaw_init import (
-    coll_gpaw_md,
-    make_gpaw_md,
     make_gpaw_relax,
-    pert_scaled_gpaw,
-    run_gpaw_md,
     run_gpaw_relax,
 )
 
@@ -636,7 +648,9 @@ def gen_init_surf(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generating initial data for surface systems.")
+    parser = argparse.ArgumentParser(
+        description="Generating initial data for surface systems."
+    )
     parser.add_argument("PARAM", type=str, help="parameter file, json/yaml format")
     parser.add_argument(
         "MACHINE",

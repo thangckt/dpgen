@@ -101,6 +101,8 @@ from dpgen.util import (
     setup_ele_temp,
 )
 
+from .arginfo import run_jdata_arginfo
+
 template_name = "template"
 train_name = "00.train"
 train_task_fmt = "%03d"
@@ -123,8 +125,6 @@ check_outcar_file = os.path.join(ROOT_PATH, "generator/lib/calypso_check_outcar.
 run_opt_file = os.path.join(ROOT_PATH, "generator/lib/calypso_run_opt.py")
 
 from dpgen.generator.lib_gpaw.gpaw import make_fp_gpaw, post_fp_gpaw
-
-from .arginfo import run_jdata_arginfo
 
 
 def _get_model_suffix(jdata) -> str:
@@ -394,8 +394,7 @@ def make_train_dp(iter_index, jdata, mdata):
                 Path(
                     os.path.normpath(
                         os.path.join(
-                            "..",
-                            "data.init",
+                            "../data.init",
                             ii,
                             os.path.relpath(
                                 single_sys, os.path.join(init_data_prefix, ii)
@@ -440,7 +439,9 @@ def make_train_dp(iter_index, jdata, mdata):
                     continue
                 for sys_single in sys_paths:
                     init_data_sys.append(
-                        os.path.normpath(os.path.join("..", "data.iters", sys_single))
+                        Path(
+                            os.path.normpath(os.path.join("../data.iters", sys_single))
+                        ).as_posix()
                     )
                     batch_size = (
                         sys_batch_size[sys_idx]
@@ -1056,7 +1057,7 @@ def find_only_one_key(lmp_lines, key):
         if len(words) >= nkey and words[:nkey] == key:
             found.append(idx)
     if len(found) > 1:
-        raise RuntimeError("found %d keywords %s" % (len(found), key))
+        raise RuntimeError(f"found {len(found)} keywords {key}")
     if len(found) == 0:
         raise RuntimeError(f"failed to find keyword {key}")
     return found[0]

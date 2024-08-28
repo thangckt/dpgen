@@ -953,7 +953,6 @@ def fp_style_variant_type_args() -> Variant:
             Argument("pwmat", dict, [], doc="TODO: add doc"),
             Argument("pwscf", dict, fp_style_pwscf_args()),
             Argument("custom", dict, fp_style_custom_args(), doc=doc_custom),
-            Argument("gpaw", dict, fp_style_gpaw_args()),
         ],
         optional=False,
         doc=doc_fp_style,

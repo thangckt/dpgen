@@ -167,7 +167,9 @@ def stru_ele(supercell_stru, stru_out, eles, natoms, jdata, path_work):
                 os.path.join(path_work, orb_file_names[ipp]),
             )
     if "dpks_descriptor" in jdata:
-        os.symlink(absolute_dpks_descriptor_path, os.path.join(path_work, dpks_descriptor_name))
+        os.symlink(
+            absolute_dpks_descriptor_path, os.path.join(path_work, dpks_descriptor_name)
+        )
 
 
 def poscar_natoms(lines):
@@ -582,7 +584,9 @@ def make_abacus_relax(jdata, mdata):
                     raise RuntimeError("Cannot find any k-points information.")
                 else:
                     relax_kpt_path = jdata["relax_kpt"]
-                    assert os.path.isfile(relax_kpt_path), f"file {relax_kpt_path} should exists"
+                    assert os.path.isfile(
+                        relax_kpt_path
+                    ), f"file {relax_kpt_path} should exists"
             else:
                 gamma_param = {"k_points": [1, 1, 1, 0, 0, 0]}
                 ret_kpt = make_abacus_scf_kpt(gamma_param)
@@ -591,7 +595,9 @@ def make_abacus_relax(jdata, mdata):
                 raise RuntimeError("Cannot find any k-points information.")
             else:
                 relax_kpt_path = jdata["relax_kpt"]
-                assert os.path.isfile(relax_kpt_path), f"file {relax_kpt_path} should exists"
+                assert os.path.isfile(
+                    relax_kpt_path
+                ), f"file {relax_kpt_path} should exists"
 
     out_dir = jdata["out_dir"]
     cwd = os.getcwd()
@@ -759,7 +765,9 @@ def pert_scaled(jdata):
     else:
         raise ValueError(f"Unsupported init_fp_style: {init_fp_style}")
 
-    python_exec = os.path.join(os.path.dirname(__file__), "tools", "create_random_disturb.py")
+    python_exec = os.path.join(
+        os.path.dirname(__file__), "tools", "create_random_disturb.py"
+    )
     pert_cmd = f"{sys.executable} {python_exec} -etmax {pert_box} -ofmt {fp_style} {poscar_name} {pert_numb} {pert_atom} > /dev/null"
 
     ### Loop over each system and scale
@@ -832,6 +840,7 @@ def pert_scaled(jdata):
                         )
             else:
                 shutil.copy2(pos_in, pos_out)
+
             os.chdir(cwd)
 
 
@@ -921,7 +930,9 @@ def make_abacus_md(jdata, mdata):
                     raise RuntimeError("Cannot find any k-points information.")
                 else:
                     md_kpt_path = jdata["md_kpt"]
-                    assert os.path.isfile(md_kpt_path), f"file {md_kpt_path} should exists"
+                    assert os.path.isfile(
+                        md_kpt_path
+                    ), f"file {md_kpt_path} should exists"
             else:
                 ret_kpt = make_abacus_scf_kpt({"k_points": [1, 1, 1, 0, 0, 0]})
         else:
@@ -969,7 +980,9 @@ def make_abacus_md(jdata, mdata):
     if "dpks_descriptor" in jdata:
         dpks_descriptor_name = os.path.basename(jdata["dpks_descriptor"])
         dpks_descriptor_abspath = os.path.abspath(jdata["dpks_descriptor"])
-        shutil.copy2(dpks_descriptor_abspath, os.path.join(path_md, dpks_descriptor_name))
+        shutil.copy2(
+            dpks_descriptor_abspath, os.path.join(path_md, dpks_descriptor_name)
+        )
     if "dpks_model" in jdata:
         dpks_model_name = os.path.basename(jdata["dpks_model"])
         dpks_model_abspath = os.path.abspath(jdata["dpks_model"])
@@ -1005,7 +1018,9 @@ def make_abacus_md(jdata, mdata):
                     pass
                 try:
                     for pp_file in [os.path.basename(a) for a in jdata["potcars"]]:
-                        os.symlink(os.path.relpath(os.path.join(path_md, pp_file)), pp_file)
+                        os.symlink(
+                            os.path.relpath(os.path.join(path_md, pp_file)), pp_file
+                        )
                     if "orb_files" in jdata:
                         for orb_file in orb_file_names:
                             os.symlink(
@@ -1019,7 +1034,9 @@ def make_abacus_md(jdata, mdata):
                         )
                     if "dpks_descriptor" in jdata:
                         os.symlink(
-                            os.path.relpath(os.path.join(path_md, dpks_descriptor_name)),
+                            os.path.relpath(
+                                os.path.join(path_md, dpks_descriptor_name)
+                            ),
                             dpks_descriptor_name,
                         )
                 except FileExistsError:
@@ -1204,7 +1221,9 @@ def coll_abacus_md(jdata):
                                 )
                             )
                 else:
-                    dlog.info(f"WARNING : in directory {os.getcwd()} NO running_md.log file found.")
+                    dlog.info(
+                        f"WARNING : in directory {os.getcwd()} NO running_md.log file found."
+                    )
         arg_cvt = " "
         if len(valid_outcars) == 0:
             raise RuntimeError(
@@ -1583,7 +1602,9 @@ def gen_init_bulk(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generating initial data for bulk systems.")
+    parser = argparse.ArgumentParser(
+        description="Generating initial data for bulk systems."
+    )
     parser.add_argument("PARAM", type=str, help="parameter file, json/yaml format")
     parser.add_argument(
         "MACHINE",
