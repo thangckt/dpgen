@@ -27,14 +27,14 @@ def fp_style_gpaw_args() -> list[Argument]:
             "fp_gpaw_runfile",
             str,
             optional=True,
-            default=str(GPAW_LIB_PATH / "cli_gpaw_singlepoint.py"),
+            default="internal_template",
             doc="Input file to run GPAW.",
         ),
         Argument(
-            "fp_gpaw_cli_args",
-            str,
+            "fp_gpaw_params",
+            dict,
             optional=True,
-            default="",
+            default=None,
             doc="CLI arguments for GPAW.",
         ),
     ]
@@ -52,16 +52,26 @@ def make_fp_gpaw(iter_index, jdata):
     jdata : dict
         Run parameters.
     """
-    ## create symbolic link of the gpaw input file in the task directory
     work_path = os.path.join(make_iter_name(iter_index), fp_name)
     fp_tasks = glob.glob(os.path.join(work_path, "task.*"))
-    gpaw_runfile = jdata["fp_gpaw_runfile"]
+
+    gpaw_runfile = jdata.get("fp_gpaw_runfile", "internal_template")
+    if gpaw_runfile == "internal_template":
+        gpaw_runfile = GPAW_LIB_PATH / "cli_gpaw_singlepoint.py"
+
     gpaw_runfile_origin = Path(gpaw_runfile).resolve()
-    assert os.path.exists(gpaw_runfile_origin), f"Can not find gpaw runfile {gpaw_runfile_origin}"
+    assert os.path.exists(gpaw_runfile_origin), f"Can not find gpaw runfile '{gpaw_runfile_origin}'"
+
+    ### generate cli arguments for gpaw
+    jdata["fp_gpaw_cli_args"] = ""
+    gpaw_params = jdata.get("fp_gpaw_params", None)
+    if gpaw_params is not None:
+        jdata["fp_gpaw_cli_args"] = " ".join([f"--{k} {v}" for k, v in gpaw_params.items()])
+
     for ii in fp_tasks:
         with set_directory(Path(ii)):
-            # create file `gpaw_runfile` in the current directory and symlink it to the source file
-            Path(gpaw_runfile).symlink_to(gpaw_runfile_origin)
+            ### create file `gpaw_runfile` in the current directory and symlink it to the source file
+            Path(Path(gpaw_runfile).name).symlink_to(gpaw_runfile_origin)
 
 
 def post_fp_gpaw(iter_index, jdata):
