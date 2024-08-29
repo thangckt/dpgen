@@ -3810,7 +3810,11 @@ def run_fp_inner(
             ).format(jdata["cutoff"])
         )
     if fp_style == "gpaw":
-        args_string = " ".join([f"--{k} {v}" for k, v in jdata.get("fp_gpaw_params", {})])
+        gpaw_params = jdata.get("fp_gpaw_params", {})
+        if gpaw_params:
+            args_string = " ".join([f"--{k} {v}" for k, v in gpaw_params.items()])
+        else:
+            args_string = ""
         fp_command = f"{fp_command} {jdata.get('fp_gpaw_runfile')} {args_string}"
 
     fp_run_tasks = fp_tasks
