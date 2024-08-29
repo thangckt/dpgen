@@ -55,18 +55,12 @@ def make_fp_gpaw(iter_index, jdata):
     work_path = os.path.join(make_iter_name(iter_index), fp_name)
     fp_tasks = glob.glob(os.path.join(work_path, "task.*"))
 
-    gpaw_runfile = jdata.get("fp_gpaw_runfile", "internal_template")
-    if gpaw_runfile == "internal_template":
-        gpaw_runfile = GPAW_LIB_PATH / "cli_gpaw_singlepoint.py"
+    gpaw_runfile = jdata.get("fp_gpaw_runfile")
+    if gpaw_runfile == "internal_gpaw_singlepoint.py":
+        gpaw_runfile = GPAW_LIB_PATH / "internal_gpaw_singlepoint.py"
 
     gpaw_runfile_origin = Path(gpaw_runfile).resolve()
     assert os.path.exists(gpaw_runfile_origin), f"Can not find gpaw runfile '{gpaw_runfile_origin}'"
-
-    ### generate cli arguments for gpaw
-    jdata["fp_gpaw_cli_args"] = ""
-    gpaw_params = jdata.get("fp_gpaw_params", None)
-    if gpaw_params is not None:
-        jdata["fp_gpaw_cli_args"] = " ".join([f"--{k} {v}" for k, v in gpaw_params.items()])
 
     for ii in fp_tasks:
         with set_directory(Path(ii)):
