@@ -7,10 +7,10 @@ name = "dpgen"
 dynamic = ["version"]
 description = "DP-GEN: The deep potential generator"
 authors = [
-  {name = "DeepModeling"},
-  {name = "Han Wang", email = "wang_han@iapcm.ac.cn"},
+    { name = "DeepModeling" },
+    { name = "Han Wang", email = "wang_han@iapcm.ac.cn" },
 ]
-license = {file = "LICENSE"}
+license = { file = "LICENSE" }
 classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -20,14 +20,14 @@ classifiers = [
 dependencies = [
     'numpy>=1.14.3',
     'dpdata>=0.2.17',
-    'cp2kdata>=0.6.6',
+    # 'cp2kdata>=0.6.6',
     'pymatgen>=2022.11.1',
     'ase',
     'monty>2.0.0',
     'paramiko',
     'custodian',
-    'GromacsWrapper>=0.8.0',
-    'GromacsWrapper>=0.9.0; python_version >= "3.12"',
+    # 'GromacsWrapper>=0.8.0',
+    # 'GromacsWrapper>=0.9.0; python_version >= "3.12"',
     'dpdispatcher>=0.3.11',
     'netCDF4',
     'dargs>=0.4.0',
@@ -61,14 +61,8 @@ dpgen = "dpgen.main:main"
 "DP-GEN init_reaction Machine" = "dpgen.data.arginfo:init_reaction_mdata_arginfo"
 
 [project.optional-dependencies]
-test = [
-    "dpgui",
-    "coverage",
-    "pymatgen-analysis-defects<2023.08.22",
-]
-gui = [
-    "dpgui",
-]
+test = ["dpgui", "coverage", "pymatgen-analysis-defects<2023.08.22"]
+gui = ["dpgui"]
 
 [tool.setuptools.packages.find]
 include = ["dpgen*"]
@@ -81,11 +75,11 @@ profile = "black"
 
 [tool.ruff]
 select = [
-    "I", # isort
-    "E", # errors
-    "F", # pyflakes
-    "D", # pydocstyle
-    "UP", # pyupgrade
+    "I",      # isort
+    "E",      # errors
+    "F",      # pyflakes
+    "D",      # pydocstyle
+    "UP",     # pyupgrade
     "TID253", # banned-module-level-imports
 ]
 ignore = [
@@ -111,9 +105,7 @@ ignore = [
 ignore-init-module-imports = true
 
 [tool.ruff.lint.flake8-tidy-imports]
-banned-module-level-imports = [
-    "pymatgen",
-]
+banned-module-level-imports = ["pymatgen"]
 
 [tool.ruff.lint.extend-per-file-ignores]
 "tests/**" = ["TID253"]
